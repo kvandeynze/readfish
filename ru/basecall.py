@@ -54,7 +54,7 @@ def _concat_signal(reads, signal_dtype, previous_signal):
 
 def _process_signal(reads, signal_dtype):
     for channel, read in reads:
-        signal = np.frombuffer(read.raw_data, dtype=signal_dtype)
+        signal = np.frombuffer(read.raw_data[:-4000], dtype=signal_dtype)
         yield read.id, channel, read.number, signal
 
 def _trim_blank(sig, window=300):
@@ -112,7 +112,7 @@ class CPUCaller():
     def __init__(
             self,
             network_type="48",
-            beam_size=5,
+            beam_size=1,
             beam_cut_threshold=0.01,
     ):
         self.network_type = network_type

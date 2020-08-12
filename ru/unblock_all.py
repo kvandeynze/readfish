@@ -18,7 +18,7 @@ from timeit import default_timer as timer
 from ru.arguments import BASE_ARGS
 from ru.utils import print_args, get_device
 from ru.utils import send_message, Severity
-from ru.read_until_client import RUClient
+from ru.read_until_client import RUClient, AccumulatingReadCache
 
 
 _help = "Unblock all reads"
@@ -62,8 +62,9 @@ def simple_analysis(client, duration, batch_size=512, throttle=0.1, unblock_dura
                 start=1,
         ):
             # pass
-            client.unblock_read(channel, read.number, read_id=read.id, duration=unblock_duration)
-            client.stop_receiving_read(channel, read.number)
+            logger.info(f"{read.id} {len(read.raw_data):>5,}")
+            #client.unblock_read(channel, read.number, read_id=read.id, duration=unblock_duration)
+            #client.stop_receiving_read(channel, read.number)
 
         t1 = timer()
         if r:
@@ -118,10 +119,12 @@ def run(parser, args):
         mk_port=position.description.rpc_ports.insecure,
         filter_strands=True,
         cache_size=args.cache_size,
+        cache_type=AccumulatingReadCache,
     )
 
     read_until_client.run(
-        **{"first_channel": args.channels[0], "last_channel": args.channels[-1]}
+        #**{"first_channel": args.channels[0], "last_channel": args.channels[-1]}
+        **{"first_channel": 456, "last_channel": 456}
     )
 
     try:

@@ -86,8 +86,10 @@ def deepnano_analysis(client, duration, batch_size=512, throttle=0.1, unblock_du
             signal_dtype=client.signal_dtype,
             decided_reads=decided_reads,
         ):
-            if channel == 368:
+            if channel == 456:
+                logger.info(f"{read_id} {len(seq):>5,}")
                 print (channel,read_id,len(seq))
+                print(seq)
 
         """
         for r, (channel, read) in enumerate(
@@ -158,11 +160,12 @@ def run(parser, args):
         mk_port=position.description.rpc_ports.insecure,
         filter_strands=True,
         cache_size=args.cache_size,
-        #cache_type=AccumulatingReadCache,
+        cache_type=AccumulatingReadCache,
     )
 
     read_until_client.run(
         **{"first_channel": args.channels[0], "last_channel": args.channels[-1]}
+        #** {"first_channel": 456, "last_channel": 456}
     )
 
     try:
