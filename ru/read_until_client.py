@@ -39,11 +39,11 @@ class RUClient(ReadUntilClient):
         )
 
 
-
         while self.connection.acquisition.current_status().status != MinknowStatus.PROCESSING:
             time.sleep(1)
 
         self.logger.info("Processing")
+        #self.reset()
 
     def _runner(
             self,
