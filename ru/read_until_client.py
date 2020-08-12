@@ -1,15 +1,10 @@
-import time
 import logging
+import time
+import queue
 from collections import OrderedDict
 from collections.abc import MutableMapping
 from pathlib import Path
 from threading import RLock
-
-
-try:
-    import queue
-except ImportError:
-    import Queue as queue
 
 from ru.utils import setup_logger
 
@@ -21,11 +16,12 @@ from read_until import ReadUntilClient
 class RUClient(ReadUntilClient):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.logger.setLevel(logging.INFO)
-        # Override ONT Cache
-        self.CacheType = AccumulatingReadCache
 
-        self.one_chunk=False
+        self.logger.setLevel(logging.INFO)
+
+        # We always want one_chunk to be False
+        self.one_chunk = False
+
         # Override signal_dtype
         self.signal_dtype = get_numpy_types(self.connection).uncalibrated_signal
 
@@ -38,20 +34,18 @@ class RUClient(ReadUntilClient):
             log_file=str(Path(self.mk_run_dir).joinpath("unblocked_read_ids.txt")),
         )
 
-
         while self.connection.acquisition.current_status().status != MinknowStatus.PROCESSING:
             time.sleep(1)
 
         self.logger.info("Processing")
-        #self.reset()
 
     def _runner(
-            self,
-            first_channel=1,
-            last_channel=512,
-            min_chunk_size=0,
-            action_batch=1000,
-            action_throttle=0.001,
+        self,
+        first_channel=1,
+        last_channel=512,
+        min_chunk_size=0,
+        action_batch=1000,
+        action_throttle=0.001,
     ):
         """Yield the stream initializer request followed by action requests
         placed into the action_queue.
@@ -73,6 +67,7 @@ class RUClient(ReadUntilClient):
                 sample_minimum_chunk_size=min_chunk_size,
             )
         )
+
         t0 = time.time()
         while self.is_running:
             t0 = time.time()
@@ -85,6 +80,7 @@ class RUClient(ReadUntilClient):
                     break
                 else:
                     actions.append(action)
+
             n_actions = len(actions)
             if n_actions > 0:
                 self.logger.debug("Sending {} actions.".format(n_actions))
@@ -92,6 +88,7 @@ class RUClient(ReadUntilClient):
                     actions=self.msgs.GetLiveReadsRequest.Actions(actions=actions)
                 )
                 yield action_group
+
             # limit response interval
             t1 = time.time()
             if t0 + action_throttle > t1:
@@ -105,8 +102,6 @@ class RUClient(ReadUntilClient):
         )
         if read_id is not None:
             self.unblock_logger.debug(read_id)
-
-        # Log read id of unblocked read
 
 
 class AccumulatingReadCache(MutableMapping):
