@@ -4,6 +4,7 @@ Extension of pyguppy Caller that maintains a connection to the basecaller
 
 """
 import logging
+import os
 
 import mappy as mp
 import numpy as np
@@ -39,6 +40,110 @@ def _create_guppy_read(reads, signal_dtype):
         logging.info(read.id)
         read_obj = GuppyRead(np.frombuffer(read.raw_data, dtype=signal_dtype), read.id, 0, 1)
         yield channel, read.number, read_obj
+
+def _concat_signal(reads, signal_dtype, previous_signal):
+    for channel, read in reads:
+        old_read_id, old_signal = previous_signal.get(channel, (("", np.empty(0, dtype=signal_dtype)),))[0]
+
+        if old_read_id == read.id:
+            signal = np.concatenate((old_signal, np.frombuffer(read.raw_data, dtype=signal_dtype)))
+        else:
+            signal = np.frombuffer(read.raw_data, dtype=signal_dtype)
+
+        yield read.id, channel, read.number, signal
+
+def _process_signal(reads, signal_dtype):
+    for channel, read in reads:
+        signal = np.frombuffer(read.raw_data, dtype=signal_dtype)
+        yield read.id, channel, read.number, signal
+
+def _trim_blank(sig, window=300):
+    N = len(sig)
+    variances = [np.var(sig[i:i+window]) for i in range(N//2, N-window, window)]
+    mean_var = np.mean(variances)
+    trim_idx = 20
+    while window > 5:
+        while np.var(sig[trim_idx: trim_idx + window]) < 0.3*mean_var:
+            trim_idx += 1
+        window //= 2
+
+    return trim_idx
+
+
+def _trim(signal, window_size=40, threshold_factor=3.0, min_elements=3):
+    med, mad = _med_mad(signal[-(window_size*25):])
+    threshold = med + mad * threshold_factor
+    num_windows = len(signal) // window_size
+
+    for pos in range(num_windows):
+
+        start = pos * window_size
+        end = start + window_size
+
+        window = signal[start:end]
+
+        if len(window[window > threshold]) > min_elements:
+            if window[-1] > threshold:
+                continue
+            return end
+
+    return 0
+
+
+def _rescale_signal(signal):
+    """Rescale signal for DeepNano"""
+    signal = signal.astype(np.float32)
+    med, mad = _med_mad(signal)
+    signal -= med
+    signal /= mad
+    return signal
+
+
+def _med_mad(x, factor=1.4826):
+    """Calculate signal median and median absolute deviation"""
+    med = np.median(x)
+    mad = np.median(np.absolute(x - med)) * factor
+    return med, mad
+
+
+class CPUCaller():
+    import deepnano2
+
+    def __init__(
+            self,
+            network_type="48",
+            beam_size=5,
+            beam_cut_threshold=0.01,
+    ):
+        self.network_type = network_type
+        self.beam_size = beam_size
+        self.beam_cut_threshold = beam_cut_threshold
+        self.caller = self.deepnano2.Caller(
+            self.network_type,
+            os.path.join(self.deepnano2.__path__[0], "weights", "rnn%s.txt" % self.network_type),
+            self.beam_size,
+            self.beam_cut_threshold,
+        )
+        logger.info("CPU Caller Up")
+
+    def basecall_minknow(self, reads, signal_dtype, decided_reads):
+        hold = {}
+        for read_id, channel, read_number, signal in _process_signal(reads, signal_dtype):
+            if read_id == decided_reads.get(channel, ""):
+                continue
+
+            start = _trim(signal)
+            signal = _rescale_signal(signal[start:])
+            if channel==368:
+                print (len(signal))
+
+            hold[read_id] = (channel, read_number)
+            seq = self.caller.call_raw_signal(signal)
+            yield hold.pop(read_id), read_id, seq, len(seq), ""
+
+    def disconnect(self):
+        """Pass through to make CPU caller compatible with GPU"""
+        pass
 
 
 class GuppyCaller(GuppyBasecallerClient):

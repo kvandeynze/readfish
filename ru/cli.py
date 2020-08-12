@@ -18,6 +18,7 @@ def main():
         ("align", "iteralign"),
         ("centrifuge", "iteralign_centrifuge"),
         ("unblock-all", "unblock_all"),
+        ("deepnano-call", "deepnano_call"),
         ("validate", "validate"),
         ("summary", "summarise_fq")
     ]
