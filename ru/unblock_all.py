@@ -62,9 +62,9 @@ def simple_analysis(client, duration, batch_size=512, throttle=0.1, unblock_dura
                 start=1,
         ):
             # pass
-            logger.info(f"{read.id} {len(read.raw_data):>5,}")
-            #client.unblock_read(channel, read.number, read_id=read.id, duration=unblock_duration)
-            #client.stop_receiving_read(channel, read.number)
+            #logger.info(f"{read.id} {len(read.raw_data):>5,}")
+            client.unblock_read(channel, read.number, read_id=read.id, duration=unblock_duration)
+            client.stop_receiving_read(channel, read.number)
 
         t1 = timer()
         if r:
@@ -112,7 +112,7 @@ def run(parser, args):
     logger.info(" ".join(sys.argv))
     print_args(args, logger=logger)
 
-    position = get_device(args.device)
+    position = get_device(args.device,host=args.host)
 
     read_until_client = RUClient(
         mk_host=position.host,
@@ -123,8 +123,8 @@ def run(parser, args):
     )
 
     read_until_client.run(
-        #**{"first_channel": args.channels[0], "last_channel": args.channels[-1]}
-        **{"first_channel": 456, "last_channel": 456}
+        **{"first_channel": args.channels[0], "last_channel": args.channels[-1]}
+        #**{"first_channel": 456, "last_channel": 456}
     )
 
     try:
