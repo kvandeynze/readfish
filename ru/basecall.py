@@ -37,7 +37,6 @@ def _create_guppy_read(reads, signal_dtype):
     GuppyRead
     """
     for channel, read in reads:
-        logging.info(read.id)
         read_obj = GuppyRead(np.frombuffer(read.raw_data, dtype=signal_dtype), read.id, 0, 1)
         yield channel, read.number, read_obj
 
@@ -134,11 +133,10 @@ class CPUCaller():
 
             start = _trim(signal)
             signal = _rescale_signal(signal[start:])
-            if channel==368:
-                print (len(signal))
 
             hold[read_id] = (channel, read_number)
             seq = self.caller.call_raw_signal(signal)
+
             yield hold.pop(read_id), read_id, seq, len(seq), ""
 
     def disconnect(self):

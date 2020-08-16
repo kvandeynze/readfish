@@ -22,16 +22,18 @@ from timeit import default_timer as timer
 
 # Third party imports
 from ru.read_until_client import RUClient
+from ru.read_until_client import AccumulatingReadCache
 import toml
 
 from ru.arguments import BASE_ARGS
 from ru.basecall import Mapper as CustomMapper
-from ru.basecall import GuppyCaller as Caller
+#from ru.basecall import GuppyCaller as Caller
+from ru.basecall import CPUCaller as Caller
 from ru.utils import print_args, get_run_info, between, setup_logger, describe_experiment
 from ru.utils import send_message, Severity, get_device
 
 
-_help = "Run targeted sequencing"
+_help = "Run targeted sequencing using DeepNano "
 _cli = BASE_ARGS + (
     (
         "--toml",
@@ -148,7 +150,8 @@ def simple_analysis(
         fh.write("# In the future this file may become a CSV file.\n")
         toml.dump(d, fh)
 
-    caller = Caller(**caller_kwargs)
+    caller = Caller()
+    #caller = Caller(**caller_kwargs)
     # What if there is no reference or an empty MMI
 
     # DefaultDict[int: collections.deque[Tuple[str, ndarray]]]
@@ -361,6 +364,9 @@ def simple_analysis(
                 decided_reads[channel] = read_id
                 decision(channel, read_number)
 
+            #adding in a test - simply reject everything
+            client.unblock_read(channel, read_number, unblock_duration, read_id)
+
             #log_decision()
 
         t1 = timer()
@@ -489,13 +495,14 @@ def run(parser, args):
     mapper = CustomMapper(reference)
     logger.info("Mapper initialised")
 
-    position = get_device(args.device)
+    position = get_device(args.device,host=args.host)
 
     read_until_client = RUClient(
         mk_host=position.host,
         mk_port=position.description.rpc_ports.insecure,
         filter_strands=True,
         cache_size=args.cache_size,
+        cache_type=AccumulatingReadCache,
     )
 
     send_message(

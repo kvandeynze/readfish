@@ -23,7 +23,7 @@ class RUClient(ReadUntilClient):
         self.one_chunk = False
 
         # Override signal_dtype
-        self.signal_dtype = get_numpy_types(self.connection).uncalibrated_signal
+        self.signal_dtype = get_numpy_types(self.connection).calibrated_signal
 
         self.mk_run_dir = self.connection.protocol.get_current_protocol_run().output_path
         if self.mk_host not in ("localhost", "127.0.0.1"):
@@ -63,7 +63,7 @@ class RUClient(ReadUntilClient):
             setup=self.msgs.GetLiveReadsRequest.StreamSetup(
                 first_channel=first_channel,
                 last_channel=last_channel,
-                raw_data_type=self.msgs.GetLiveReadsRequest.UNCALIBRATED,
+                raw_data_type=self.msgs.GetLiveReadsRequest.CALIBRATED,
                 sample_minimum_chunk_size=min_chunk_size,
             )
         )
@@ -101,7 +101,8 @@ class RUClient(ReadUntilClient):
             read_channel=read_channel, read_number=read_number, duration=duration,
         )
         if read_id is not None:
-            self.unblock_logger.debug(read_id)
+            pass
+            #self.unblock_logger.debug(read_id)
 
 
 class AccumulatingReadCache(MutableMapping):

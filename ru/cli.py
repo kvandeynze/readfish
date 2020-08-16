@@ -15,6 +15,7 @@ def main():
 
     cmds = [
         ("targets", "ru_gen"),
+        ("deepnano_targets", "ru_gen_deepnano"),
         ("align", "iteralign"),
         ("centrifuge", "iteralign_centrifuge"),
         ("unblock-all", "unblock_all"),

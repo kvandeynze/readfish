@@ -153,7 +153,7 @@ def run(parser, args):
     logger.info(" ".join(sys.argv))
     print_args(args, logger=logger)
 
-    position = get_device(args.device)
+    position = get_device(args.device,host=args.host)
 
     read_until_client = RUClient(
         mk_host=position.host,
