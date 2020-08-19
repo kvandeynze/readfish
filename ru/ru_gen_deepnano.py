@@ -365,7 +365,7 @@ def simple_analysis(
                 decision(channel, read_number)
 
             #adding in a test - simply reject everything
-            client.unblock_read(channel, read_number, unblock_duration, read_id)
+            #client.unblock_read(channel, read_number, unblock_duration, read_id)
 
             #log_decision()
 
@@ -533,7 +533,7 @@ def run(parser, args):
     #  the read_until_client
 
     read_until_client.run(
-        **{"first_channel": args.channels[0], "last_channel": args.channels[-1]}
+        **{"first_channel": args.channels[0], "last_channel": args.channels[-1],"action_throttle":0.4}
     )
 
     try:
