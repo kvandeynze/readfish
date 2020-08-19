@@ -42,7 +42,7 @@ def rescale_signal(signal):
     return signal
 
 
-class CPUCaller:
+class DeepNanoClient:
     def __init__(
         self, network_type="56", beam_size=5, beam_cut_threshold=0.01, threads=2
     ):
@@ -101,7 +101,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         t = int(sys.argv[1])
     # TODO: test with actual signal data
-    c = CPUCaller(threads=t)
+    c = DeepNanoClient(threads=t)
     c.start()
 
     for i in range(4):

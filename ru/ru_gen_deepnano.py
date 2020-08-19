@@ -28,7 +28,8 @@ import toml
 from ru.arguments import BASE_ARGS
 from ru.basecall import Mapper as CustomMapper
 #from ru.basecall import GuppyCaller as Caller
-from ru.basecall import CPUCaller as Caller
+#from ru.basecall import CPUCaller as Caller
+from ru.basecall import DeepCaller as Caller
 from ru.utils import print_args, get_run_info, between, setup_logger, describe_experiment
 from ru.utils import send_message, Severity, get_device
 
@@ -150,6 +151,7 @@ def simple_analysis(
         fh.write("# In the future this file may become a CSV file.\n")
         toml.dump(d, fh)
 
+    #caller = Caller()
     caller = Caller()
     #caller = Caller(**caller_kwargs)
     # What if there is no reference or an empty MMI

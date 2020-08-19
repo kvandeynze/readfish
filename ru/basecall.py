@@ -11,12 +11,33 @@ import numpy as np
 
 from pyguppyclient.client import GuppyBasecallerClient
 from pyguppyclient.decode import ReadData as GuppyRead
+from ru.dnb_mp import DeepNanoClient
 
 
 __all__ = ["GuppyCaller"]
 
 logger = logging.getLogger("RU_basecaller")
 
+
+def _create_deepnano_read(reads, signal_dtype,signalchunk=4000):
+    """
+
+    Parameters
+    ----------
+    reads
+    signal_dtype
+
+    Returns
+    -------
+
+    """
+    for channel,read in reads:
+        yield {
+            "signal":np.frombuffer(read.raw_data, dtype=signal_dtype)[-signalchunk:],
+            "read_id":read.id,
+            "channel":channel,
+            "read_number":read.number,
+        }
 
 def _create_guppy_read(reads, signal_dtype):
     """Convert a read from MinKNOW RPC to GuppyRead
@@ -104,6 +125,69 @@ def _med_mad(x, factor=1.4826):
     mad = np.median(np.absolute(x - med)) * factor
     return med, mad
 
+class DeepCaller(DeepNanoClient):
+    def __init__(
+            self,
+            network_type="96",
+            beam_size=5,
+            beam_cut_threshold=0.01,
+            threads = 4,
+    ):
+        super().__init__(
+            network_type=network_type,
+            beam_size=beam_size,
+            beam_cut_threshold=beam_cut_threshold,
+            threads=threads
+                         )
+        self.start()
+
+    def basecall_minknow(self, reads, signal_dtype, decided_reads):
+        """DeepNano basecaller wrapper for MinKNOW RPC reads
+
+        Parameters
+        ----------
+        reads : iterable[Tuple[int, rpc.Read]]
+            List or generator of tuples containing (channel, MinKNOW.rpc.Read)
+        signal_dtype
+            Numpy dtype of the raw data
+        prev_signal : DefaultDict[int: collections.deque[Tuple[str, np.ndarray]]]
+            Dictionary of previous signal fragment from a channel
+        decided_reads : Dict[int: str]
+            Dictionary of channels with the last read id a decision was made for
+
+        Yields
+        ------
+        read_info : tuple
+            Tuple of read info (channel, read_number)
+        read_id : str
+        sequence : str
+        sequence_length : int
+        quality : str
+        """
+        done = 0
+        read_counter = 0
+        read_list = []
+        for read in _create_deepnano_read(reads, signal_dtype):
+            if read["read_id"] == decided_reads.get(read["channel"], ""):
+                continue
+            read_list.append(read)
+
+        self.pass_data(read_list)
+
+        read_counter = len(read_list)
+
+        while done < read_counter:
+            res = self.get_completed()
+
+            if not res:
+                continue
+            for read in res:
+                yield (read["channel"],read["read_number"]),read["read_id"],read["seq"],len(read["seq"]),read["qual"]
+                done += 1
+
+    def disconnect(self):
+        self.terminate()
+
 
 class CPUCaller():
     import deepnano2
@@ -143,7 +227,6 @@ class CPUCaller():
     def disconnect(self):
         """Pass through to make CPU caller compatible with GPU"""
         pass
-
 
 class GuppyCaller(GuppyBasecallerClient):
     def __init__(self, **kwargs):
