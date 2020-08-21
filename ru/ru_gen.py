@@ -378,7 +378,9 @@ def run(parser, args):
         __name__, log_format=args.log_format, log_file=args.log_file, level=logging.INFO,
     )
     if args.log_file is not None:
-        logger.addHandler(logging.StreamHandler())
+        h = logging.StreamHandler()
+        h.setFormatter(logging.Formatter(args.log_format))
+        logger.addHandler(h)
     logger.info(" ".join(sys.argv))
     print_args(args, logger=logger)
 
@@ -392,7 +394,7 @@ def run(parser, args):
     mapper = CustomMapper(reference)
     logger.info("Mapper initialised")
 
-    position = get_device(args.device)
+    position = get_device(args.device,host=args.host)
 
     read_until_client = RUClient(
         mk_host=position.host,
