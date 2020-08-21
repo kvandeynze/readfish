@@ -6,6 +6,9 @@ import sys
 
 import toml
 import mappy as mp
+import pandas as pd
+
+from ru.readpaf import parse_paf
 
 
 _help = "Summary stats from FASTQ files"
@@ -70,8 +73,45 @@ def N50(arr):
     s = sum(arr)
     return int(arr[[i for i, c in icumsum(arr) if c >= s * 0.5][0]])
 
+def n50(lengths):
+    """
+    Calculate N50 from a list of lengths
+    :param lengths: list of lengths as ints
+    :return: N50 as an int
+    """
+    df = lengths
+    df = df[df.query_length != 0]
+    df = df.sort_values(by='query_length')
+    df['cum_sum'] = df.query_length.cumsum()
+    length_sum = df.query_length.sum()
+    reads_n50 = int(df.query_length.where(df.cum_sum > length_sum / 2).dropna().iloc[0])
+
+    return reads_n50
+
 
 def main():
+    print ("ok - as its you...")
+    print (sys.argv)
+    with open(sys.argv[1], "r") as handle:
+        df = parse_paf(handle, dataframe=True)
+
+    df = df[['query_name', 'query_length', 'target_name']]
+    df.drop_duplicates(subset="query_name",
+                         keep=False, inplace=True)
+
+    result = df.groupby(['target_name'], as_index=True).agg(
+        {'query_length': ['count','sum','min','max','median','mean', 'std']})
+
+    result.columns = result.columns.droplevel()
+
+    result2 = df.groupby(['target_name'], as_index=True).apply(n50).reset_index(name='n50').set_index('target_name')
+
+
+
+    result3 = result.join(result2)
+
+    print (result3)
+
     sys.exit(
        "This entry point is deprecated, please use 'readfish summary' instead"
     )
