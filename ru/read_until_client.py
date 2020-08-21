@@ -110,8 +110,7 @@ class RUClient(ReadUntilClient):
             read_channel=read_channel, read_number=read_number, duration=duration,
         )
         if read_id is not None:
-            pass
-            #self.unblock_logger.debug(read_id)
+            self.unblock_logger.debug(read_id)
 
 
 class AccumulatingReadCache(MutableMapping):
