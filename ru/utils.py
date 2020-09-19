@@ -499,7 +499,6 @@ def describe_experiment(conditions, mapper):
     if mapper.initialised:
         yield "Using reference: {}".format(mapper.index), Severity.INFO
         seq_names = set(mapper.mapper.seq_names)
-        print(conditions)
         for region in conditions:
             conds = {
                 "unblock": [],
