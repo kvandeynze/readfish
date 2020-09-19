@@ -362,7 +362,7 @@ def simple_analysis(
 
         if interval_checker + interval < t1:
             interval_checker = t1
-            send_message(client.connection, "Updating Statistics - accepted {:.2f}% of reads. Seen {} total reads. Unblocked {} reads.".format(decisiontracker.fetch_proportion_accepted(),decisiontracker.fetch_total_reads(), decisiontracker.fetch_unblocks()), Severity.INFO)
+            send_message(client.connection, "ReadFish Stats - accepted {:.2f}% of {} total reads. Unblocked {} reads.".format(decisiontracker.fetch_proportion_accepted(),decisiontracker.fetch_total_reads(), decisiontracker.fetch_unblocks()), Severity.INFO)
 
     else:
         send_message(client.connection, "ReadFish Client Stopped.", Severity.WARN)
