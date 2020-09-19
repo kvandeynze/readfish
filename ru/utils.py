@@ -499,7 +499,7 @@ def describe_experiment(conditions, mapper):
     if mapper.initialised:
         yield "Using reference: {}".format(mapper.index), Severity.INFO
         seq_names = set(mapper.mapper.seq_names)
-
+        print(conditions)
         for region in conditions:
             conds = {
                 "unblock": [],
@@ -509,8 +509,9 @@ def describe_experiment(conditions, mapper):
             for m in ("single_on", "single_off", "multi_on", "multi_off", "no_map", "no_seq"):
                 conds[getattr(region, m)].append(m)
             conds = {k: nice_join(v) for k, v in conds.items()}
+
             s = (
-                "Region '{}' (control={}) has {} target{} of which {} are in the reference. "
+                "Region '{}' (control={}) has {} contig{} of which {} are in the reference. "
                 "Reads will be unblocked when classed as {unblock}; sequenced when classed as "
                 "{stop_receiving}; and polled for more data when classed as {proceed}.".format(
                     region.name,
@@ -534,7 +535,7 @@ def describe_experiment(conditions, mapper):
                 conds[getattr(region, m)].append(m)
             conds = {k: nice_join(v) for k, v in conds.items()}
             s = (
-                "Region '{}' (control={}) has {} target{}. "
+                "Region '{}' (control={}) has {} contig{}. "
                 "Reads will be unblocked when classed as {unblock}; sequenced when classed as "
                 "{stop_receiving}; and polled for more data when classed as {proceed}.".format(
                     region.name,
@@ -544,6 +545,7 @@ def describe_experiment(conditions, mapper):
                     **conds,
                 )
             )
+
             yield s, Severity.WARN
 
 
