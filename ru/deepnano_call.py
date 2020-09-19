@@ -27,7 +27,7 @@ from ru.basecall import CPUCaller as Caller
 
 
 
-_help = "Call read chunks with DeepNano really?"
+_help = "Call read chunks with DeepNano really."
 _cli = BASE_ARGS
 
 def med_mad(x, factor=1.4826):
