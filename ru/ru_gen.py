@@ -219,7 +219,6 @@ def simple_analysis(
         loop_counter += 1
         t0 = timer()
         r = 0
-        print ("are we here?")
         for read_info, read_id, seq_len, results in mapper.map_reads_2(
                 caller.basecall_minknow(
                     reads=client.get_read_chunks(batch_size=batch_size, last=True),
@@ -227,7 +226,6 @@ def simple_analysis(
                     decided_reads=decided_reads,
                 )
         ):
-            print (read_id)
             r += 1
             read_start_time = timer()
             channel, read_number = read_info

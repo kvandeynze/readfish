@@ -13,6 +13,8 @@ from minknow_api.data import get_numpy_types
 from read_until import ReadUntilClient
 
 
+### So DEEPNANO requires calibrated signal whilst guppy requires uncalibrated. This needs work
+
 class RUClient(ReadUntilClient):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -23,7 +25,7 @@ class RUClient(ReadUntilClient):
         self.one_chunk = False
 
         # Override signal_dtype
-        self.signal_dtype = get_numpy_types(self.connection).calibrated_signal
+        self.signal_dtype = get_numpy_types(self.connection).uncalibrated_signal
 
         self.mk_run_dir = self.connection.protocol.get_current_protocol_run().output_path
         if self.mk_host not in ("localhost", "127.0.0.1"):
@@ -73,7 +75,7 @@ class RUClient(ReadUntilClient):
             setup=self.msgs.GetLiveReadsRequest.StreamSetup(
                 first_channel=first_channel,
                 last_channel=last_channel,
-                raw_data_type=self.msgs.GetLiveReadsRequest.CALIBRATED,
+                raw_data_type=self.msgs.GetLiveReadsRequest.UNCALIBRATED,
                 sample_minimum_chunk_size=min_chunk_size,
             )
         )
