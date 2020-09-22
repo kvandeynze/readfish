@@ -24,7 +24,7 @@ from ru.arguments import BASE_ARGS
 from ru.basecall import Mapper as CustomMapper
 from ru.basecall import GuppyCaller as Caller
 from ru.utils import print_args, get_run_info, between, setup_logger, describe_experiment
-from ru.utils import send_message, Severity, get_device
+from ru.utils import send_message, Severity, get_device, DecisionTracker
 
 
 _help = "Run targeted sequencing"
@@ -146,12 +146,19 @@ def simple_analysis(
     caller = Caller(**caller_kwargs)
     # What if there is no reference or an empty MMI
 
+    decisiontracker = DecisionTracker()
+
     # DefaultDict[int: collections.deque[Tuple[str, ndarray]]]
     #  tuple is (read_id, previous_signal)
     # TODO: tuple should use read_number instead
     previous_signal = defaultdict(functools.partial(deque, maxlen=1))
     # count how often a read is seen
     tracker = defaultdict(Counter)
+
+    interval = 60  # time in seconds we are going to log a message #ToDo: set to be an interval
+    interval_checker = timer()
+
+
     # decided
     decided_reads = {}
     strand_converter = {1: "+", -1: "-"}
@@ -318,7 +325,9 @@ def simple_analysis(
             # If max_chunks has been exceeded AND we don't want to keep sequencing we unblock
             if exceeded_threshold and decision_str != "stop_receiving":
                 mode = "exceeded_max_chunks_unblocked"
+                decisiontracker.event_seen(mode)
                 client.unblock_read(channel, read_number, unblock_duration, read_id)
+
 
             # TODO: WHAT IS GOING ON?!
             #  I think that this needs to change between enrichment and depletion
@@ -332,11 +341,13 @@ def simple_analysis(
             }:
                 mode = "below_min_chunks_unblocked"
                 client.unblock_read(channel, read_number, unblock_duration, read_id)
+                decisiontracker.event_seen(decision_str)
 
             # proceed returns None, so we send no decision; otherwise unblock or stop_receiving
             elif decision is not None:
                 decided_reads[channel] = read_id
                 decision(channel, read_number)
+                decisiontracker.event_seen(decision_str)
 
             log_decision()
 

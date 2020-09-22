@@ -19,8 +19,8 @@ from ru.utils import nice_join, print_args, send_message, Severity, get_device
 from minknow_api.acquisition_pb2 import MinknowStatus
 from ru.run_until_utils import parse_fastq_file,write_new_toml
 from ru.run_until_utils import FastqHandler
-from ru.ru_gen_deepnano import _cli as BASE
-from ru.ru_gen_deepnano import run as dnrun
+from ru.ru_gen import _cli as BASE
+from ru.ru_gen import run as dnrun
 from argparse import Namespace
 
 
