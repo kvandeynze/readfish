@@ -9,6 +9,7 @@ from threading import RLock
 
 from minknow_api.acquisition_pb2 import MinknowStatus
 from minknow_api.data import get_numpy_types
+
 from read_until import ReadUntilClient
 
 
