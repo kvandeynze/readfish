@@ -219,7 +219,7 @@ def simple_analysis(
         loop_counter += 1
         t0 = timer()
         r = 0
-
+        print ("are we here?")
         for read_info, read_id, seq_len, results in mapper.map_reads_2(
                 caller.basecall_minknow(
                     reads=client.get_read_chunks(batch_size=batch_size, last=True),
@@ -227,6 +227,7 @@ def simple_analysis(
                     decided_reads=decided_reads,
                 )
         ):
+            print (read_id)
             r += 1
             read_start_time = timer()
             channel, read_number = read_info
@@ -358,6 +359,11 @@ def simple_analysis(
         # limit the rate at which we make requests
         if t0 + throttle > t1:
             time.sleep(throttle + t0 - t1)
+
+        if interval_checker + interval < t1:
+            interval_checker = t1
+            send_message(client.connection, "ReadFish Stats - accepted {:.2f}% of {} total reads. Unblocked {} reads.".format(decisiontracker.fetch_proportion_accepted(),decisiontracker.fetch_total_reads(), decisiontracker.fetch_unblocks()), Severity.INFO)
+
     else:
         send_message(client.connection, "ReadFish Client Stopped.", Severity.WARN)
         caller.disconnect()

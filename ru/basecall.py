@@ -58,7 +58,7 @@ def _create_guppy_read(reads, signal_dtype):
     GuppyRead
     """
     for channel, read in reads:
-        logging.info(read.id)
+        #logging.info(read.id)
         read_obj = GuppyRead(
             np.frombuffer(read.raw_data, dtype=signal_dtype), read.id, 0, 1
         )
@@ -261,7 +261,7 @@ class GuppyCaller(GuppyBasecallerClient):
         """
         done = 0
         read_counter = 0
-
+        print ("yeah boy")
         hold = {}
         for channel, read_number, read in _create_guppy_read(reads, signal_dtype):
             if read.read_id == decided_reads.get(channel, ""):

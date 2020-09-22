@@ -250,6 +250,7 @@ def run(parser, args):
     event_handler = FastQMonitor(args,logging,connection)
     # This block handles the fastq
     observer = Observer()
+    print (args.watch)
     observer.schedule(event_handler, path=args.watch, recursive=True)
     observer.daemon = True
 
