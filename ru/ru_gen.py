@@ -142,6 +142,7 @@ def simple_analysis(
         fh.write("# In the future this file may become a CSV file.\n")
         toml.dump(d, fh)
 
+
     caller = Caller(**caller_kwargs)
     # What if there is no reference or an empty MMI
 

@@ -401,7 +401,6 @@ def run(parser, args):
         logger.addHandler(h)
     logger.info(" ".join(sys.argv))
     print_args(args, logger=logger)
-
     # Parse configuration TOML
     # TODO: num_channels is not configurable here, should be inferred from client
     run_info, conditions, reference, caller_kwargs = get_run_info(args.toml, num_channels=512)
