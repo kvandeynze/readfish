@@ -261,7 +261,7 @@ class GuppyCaller(GuppyBasecallerClient):
         """
         done = 0
         read_counter = 0
-        print ("yeah boy")
+        
         hold = {}
         for channel, read_number, read in _create_guppy_read(reads, signal_dtype):
             if read.read_id == decided_reads.get(channel, ""):
