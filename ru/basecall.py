@@ -131,7 +131,7 @@ def _med_mad(x, factor=1.4826):
 class DeepCaller(DeepNanoClient):
     def __init__(
             self,
-            network_type="96",
+            network_type="64",
             beam_size=5,
             beam_cut_threshold=0.01,
             threads = 4,
