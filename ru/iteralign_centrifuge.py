@@ -16,11 +16,11 @@ import subprocess
 import sys
 import threading
 import time
+from argparse import Namespace
 
 from io import StringIO, BytesIO
 import gzip
 
-import argparse
 from pathlib import Path
 import shutil
 import urllib.request as request
@@ -32,7 +32,8 @@ import toml
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers.polling import PollingObserver as Observer
 
-from ru.utils import nice_join, print_args, send_message, Severity
+from ru.utils import nice_join, print_args, send_message, Severity, get_device
+from ru.run_until_utils import FastqHandler
 from minknow_api.acquisition_pb2 import MinknowStatus
 
 from Bio import SeqIO
@@ -387,8 +388,8 @@ def generate_mmi(args, counter):
 
 def parse_fastq_file(fastqfileList, args, logging, length_dict, taxID_set, counter, coverage_sum, connection):
     logger = logging.getLogger("ParseFastq")
-    logger.info(fastqfileList)
-    logger.info(args.toml['conditions']['reference'])
+    #logger.info(fastqfileList)
+    #logger.info(args.toml['conditions']['reference'])
     with open(os.devnull, 'w') as devnull:
 
         # convert the 'fastqfileList' into a string valid for the list of fastq files to be read by centrifuge
@@ -401,7 +402,7 @@ def parse_fastq_file(fastqfileList, args, logging, length_dict, taxID_set, count
                                                                )
 
         # show what the centrifuge command in the terminal
-        logging.info(centrifuge_cmd)
+        #logging.info(centrifuge_cmd)
 
         # start time of centrifuge to track the time centrifuge requires to classify reads
         centrifuge_start_time = time.time()
@@ -419,7 +420,7 @@ def parse_fastq_file(fastqfileList, args, logging, length_dict, taxID_set, count
         out, err = proc.communicate()
         proc.stdout.close()
 
-        # confirm that the centrifuge pipeline has finished and show the time of execusion
+        # confirm that the centrifuge pipeline has finished and show the time of execut ion
         logging.info("Post centrifuge run: {} seconds".format(time.time()-centrifuge_start_time))
 
         output_fields = ["readID", "seqID", "taxID", "hitLength", "queryLength", "numMatches"]
@@ -430,7 +431,10 @@ def parse_fastq_file(fastqfileList, args, logging, length_dict, taxID_set, count
                              usecols=output_fields
                              )
 
+
+
         # create a dataframe from the args.creport 'centrifuge_report.tsv'
+        print (args.creport)
         report_df = pd.read_csv(args.creport,
                                 sep="\t",
                                 usecols=["name", "genomeSize", "taxID"],
@@ -449,7 +453,7 @@ def parse_fastq_file(fastqfileList, args, logging, length_dict, taxID_set, count
         intermediate_df = intermediate_df[intermediate_df.numMatches == 1]
         intermediate_df["reason"] = "Read aligns to non-species taxon"
 
-        # log the reads that were removed into a seperate file
+        # log the reads that were removed into a separate file
         reject_df = reject_df.append(intermediate_df)
         if os.path.isfile(args.path + args.prefix + args.reject):
             reject_df.to_csv(args.path + args.prefix + args.reject,
@@ -541,43 +545,53 @@ def parse_fastq_file(fastqfileList, args, logging, length_dict, taxID_set, count
         # all of the new code has been parsed, the rest follows standard 'iteralign.py' script
         logging.info("new code parsing completed\n\ncommencing iteralign")
 
-        minimapcmd = ["minimap2","-ax","map-ont","-t {}".format(args.threads),args.toml['conditions']['reference']] #" ".join(fastqfilelist)]
-        minimapcmd.extend(fastqfileList)
-        logging.info(" ".join(minimapcmd))
-        minimapoutput = subprocess.Popen(minimapcmd, stdout=subprocess.PIPE,stderr=devnull)
+        ###We only want to run this if we have a reference set to look at.
 
-        samcmd = ["samtools","view", "-bS"]
-        samoutput = subprocess.Popen(samcmd, stdin=minimapoutput.stdout, stdout=subprocess.PIPE, stderr=devnull)
-        #samsortcmd = ["samtools", "sort", "-@2", "-o", "sortedbam.bam"]
-        samsortcmd = ["samtools", "sort", "-@{}".format(args.threads)]
-        samsortoutput = subprocess.Popen(samsortcmd, stdin=samoutput.stdout, stdout=subprocess.PIPE, stderr=devnull)
-        samdepthcmd = ["samtools", "depth", "/dev/stdin"]
-        samdepthoutput = subprocess.Popen(samdepthcmd, stdin=samsortoutput.stdout,stdout=subprocess.PIPE, stderr=devnull, universal_newlines=True)
-        minimapoutput.stdout.close()
-        samoutput.stdout.close()
-        samsortoutput.stdout.close()
+        print ("!!!!!!!!{}".format(len(taxID_set)))
 
-        iter_depth = (l.strip().split("\t") for l in samdepthoutput.stdout)
-        parse_iter = ((x[0], int(x[-1])) for x in iter_depth)
+        if len(taxID_set)>0:
 
-        d = defaultdict(int)
-        d.update(coverage_sum)
-        for name, depth in parse_iter:
-            d[name] += depth
+            minimapcmd = ["minimap2","-ax","map-ont","-t {}".format(args.threads),args.toml['conditions']['reference']] #" ".join(fastqfilelist)]
+            minimapcmd.extend(fastqfileList)
+            #logging.info(" ".join(minimapcmd))
+            minimapoutput = subprocess.Popen(minimapcmd, stdout=subprocess.PIPE,stderr=devnull)
 
-        depth_dict = {k: d[k]/length_dict[k] for k in length_dict.keys() & d}
+            samcmd = ["samtools","view", "-bS"]
+            samoutput = subprocess.Popen(samcmd, stdin=minimapoutput.stdout, stdout=subprocess.PIPE, stderr=devnull)
+            #samsortcmd = ["samtools", "sort", "-@2", "-o", "sortedbam.bam"]
+            samsortcmd = ["samtools", "sort", "-@{}".format(args.threads)]
+            samsortoutput = subprocess.Popen(samsortcmd, stdin=samoutput.stdout, stdout=subprocess.PIPE, stderr=devnull)
+            samdepthcmd = ["samtools", "depth", "/dev/stdin"]
+            samdepthoutput = subprocess.Popen(samdepthcmd, stdin=samsortoutput.stdout,stdout=subprocess.PIPE, stderr=devnull, universal_newlines=True)
+            minimapoutput.stdout.close()
+            samoutput.stdout.close()
+            samsortoutput.stdout.close()
 
-        with open(args.path + args.prefix + args.coveragefile, "a") as fh:
-            for k, v in depth_dict.items():
-                fh.write("{}\t{}\t{}\n".format(counter, k, v))
+            iter_depth = (l.strip().split("\t") for l in samdepthoutput.stdout)
+            parse_iter = ((x[0], int(x[-1])) for x in iter_depth)
 
-        targets = [k for k, v in depth_dict.items() if v > args.depth]
+            d = defaultdict(int)
+            d.update(coverage_sum)
+            for name, depth in parse_iter:
+                d[name] += depth
 
-        logging.info(targets)
+            depth_dict = {k: d[k]/length_dict[k] for k in length_dict.keys() & d}
+
+            with open(args.path + args.prefix + args.coveragefile, "a") as fh:
+                for k, v in depth_dict.items():
+                    fh.write("{}\t{}\t{}\n".format(counter, k, v))
+
+            targets = [k for k, v in depth_dict.items() if v > args.depth]
+
+            logging.info(targets)
+
+        else:
+            d = defaultdict(int)
+            targets = []
 
         counter += 1
 
-        logging.info("Finished processing {}.".format(" ".join(fastqfileList)))
+        #logging.info("Finished processing {}.".format(" ".join(fastqfileList)))
 
     return targets, downloaded_set, counter, d
 
@@ -598,24 +612,14 @@ def write_new_toml(args,targets):
         toml.dump(args.toml,f)
 
 
-class FastqHandler(FileSystemEventHandler):
-
-    def __init__(self, args, logging, messageport, rpc_connection):
-        self.args = args
-        self.messageport = messageport
-        self.connection = rpc_connection
-        self.logger = logging.getLogger("FastqHandler")
-        self.running = True
-        self.fastqdict = dict()
-        self.creates = file_dict_of_folder_simple(self.args.watch, self.args, logging,
-                                                  self.fastqdict)
-        self.t = threading.Thread(target=self.processfiles)
-
-        try:
-            self.t.start()
-        except KeyboardInterrupt:
-            self.t.stop()
-            raise
+class FastQMonitor(FastqHandler):
+    def __init__(self,args,logging,rpc_connection):
+        super().__init__(
+            args=args,
+            logging=logging,
+            #messageport=messageport,
+            rpc_connection=rpc_connection,
+        )
 
     def processfiles(self):
         self.logger.info("Process Files Inititated")
@@ -638,7 +642,7 @@ class FastqHandler(FileSystemEventHandler):
 
         while self.running:
             currenttime = time.time()
-            # for fastqfile, createtime in tqdm(sorted(self.creates.items(), key=lambda x: x[1])):
+
             fastqfilelist = list()
             for fastqfile, createtime in sorted(self.creates.items(), key=lambda x: x[1]):
 
@@ -655,7 +659,16 @@ class FastqHandler(FileSystemEventHandler):
             # as long as there are files within the args.watch directory to parse
             if fastqfilelist:
                 print(self.downloaded_set)
-                targets, self.downloaded_set, self.taxid_entries, self.coverage_sum = parse_fastq_file(fastqfilelist, self.args, logging, self.length_dict, self.downloaded_set, self.taxid_entries, self.coverage_sum, self.connection)
+                targets, self.downloaded_set, self.taxid_entries, self.coverage_sum = parse_fastq_file(
+                    fastqfilelist,
+                    self.args,
+                    logging,
+                    self.length_dict,
+                    self.downloaded_set,
+                    self.taxid_entries,
+                    self.coverage_sum,
+                    self.connection
+                )
                 print(targets)
                 print(self.targets)
 
@@ -681,38 +694,9 @@ class FastqHandler(FileSystemEventHandler):
                         send_message(self.connection, "Iter Align has stopped the run as all targets should be covered by at least {}x".format(
                                 self.args.depth), Severity.WARN)
 
-                # parse_fastq_file(fastqfile, self.rundict, self.fastqdict, self.args, self.header, self.MinotourConnection)
-
-                # self.args.files_processed += 1
-
                 if currenttime + 5 > time.time():
                     time.sleep(5)
 
-    def on_created(self, event):
-        """Watchdog counts a new file in a folder it is watching as a new file"""
-        """This will add a file which is added to the watchfolder to the creates and the info file."""
-        # if (event.src_path.endswith(".fastq") or event.src_path.endswith(".fastq.gz")):
-        #     self.creates[event.src_path] = time.time()
-
-        # time.sleep(5)
-        if (event.src_path.endswith(".fastq") or event.src_path.endswith(".fastq.gz") or event.src_path.endswith(
-                ".fq") or event.src_path.endswith(".fq.gz")):
-            self.logger.info("Processing file {}".format(event.src_path))
-            self.creates[event.src_path] = time.time()
-
-    def on_modified(self, event):
-        if (event.src_path.endswith(".fastq") or event.src_path.endswith(".fastq.gz") or event.src_path.endswith(
-                ".fq") or event.src_path.endswith(".fq.gz")):
-            self.logger.info("Processing file {}".format(event.src_path))
-            self.logger.debug("Modified file {}".format(event.src_path))
-            self.creates[event.src_path] = time.time()
-
-    def on_moved(self, event):
-        if any((event.dest_path.endswith(".fastq"), event.dest_path.endswith(".fastq,gz"),
-                event.dest_path.endswith(".gq"), event.dest_path.endswith(".fq.gz"))):
-            self.logger.info("Processing file {}".format(event.dest_path))
-            self.logger.debug("Modified file {}".format(event.dest_path))
-            self.creates[event.dest_path] = time.time()
 
 
 def main():
@@ -721,12 +705,11 @@ def main():
     )
 
 def run(parser, args):
-    # new code block: change the reference path within the args.toml file into the args.mindex path
-    d = toml.load(args.toml)
+    args_copy = Namespace(**vars(args)) ## Make a copy of args to pass on to the read until client later.
 
-    print(d["conditions"]["reference"])
     args.tomlfile = args.toml
     args.toml = toml.load(args.toml)
+
     print(args)
 
     # TODO: Move logging config to separate configuration file
@@ -768,7 +751,8 @@ def run(parser, args):
         args.simulation = False
         logger.info("Creating rpc connection for device {}.".format(args.device))
         try:
-            connection, messageport = get_rpc_connection(args.device)
+            connection = get_device(args.device).connect()
+            #connection, messageport = get_rpc_connection(args.device)
         except ValueError as e:
             print(e)
             sys.exit(1)
@@ -785,7 +769,7 @@ def run(parser, args):
     else:
         messageport = ""
 
-    event_handler = FastqHandler(args, logging, messageport, connection)
+    event_handler = FastQMonitor(args, logging, connection)
     # This block handles the fastq
     observer = Observer()
     observer.schedule(event_handler, path=args.watch, recursive=True)
