@@ -34,6 +34,7 @@ from watchdog.observers.polling import PollingObserver as Observer
 
 from ru.utils import nice_join, print_args, send_message, Severity, get_device
 from ru.run_until_utils import FastqHandler
+from ru.centrifuge import CentrifugeServer
 from minknow_api.acquisition_pb2 import MinknowStatus
 
 from Bio import SeqIO
@@ -386,14 +387,17 @@ def generate_mmi(args, counter):
     minimap_db.stdout.close()
 
 
-def parse_fastq_file(fastqfileList, args, logging, length_dict, taxID_set, counter, coverage_sum, connection):
+def parse_fastq_file(fastqfileList, args, logging, length_dict, taxID_set, counter, coverage_sum, connection,centrifuge):
     logger = logging.getLogger("ParseFastq")
     #logger.info(fastqfileList)
     #logger.info(args.toml['conditions']['reference'])
     with open(os.devnull, 'w') as devnull:
+        centrifuge.classify(fastqfileList)
 
         # convert the 'fastqfileList' into a string valid for the list of fastq files to be read by centrifuge
         fastq_str = ",".join(fastqfileList)
+
+
 
         # centrifuge command to classify reads in the fastq files found by watchdog
         centrifuge_cmd = "centrifuge -p {} -x {} -q {}".format(args.threads,
@@ -620,6 +624,7 @@ class FastQMonitor(FastqHandler):
             #messageport=messageport,
             rpc_connection=rpc_connection,
         )
+        self.centrifuge = CentrifugeServer(args)
 
     def processfiles(self):
         self.logger.info("Process Files Inititated")
@@ -667,7 +672,8 @@ class FastQMonitor(FastqHandler):
                     self.downloaded_set,
                     self.taxid_entries,
                     self.coverage_sum,
-                    self.connection
+                    self.connection,
+                    self.centrifuge
                 )
                 print(targets)
                 print(self.targets)
