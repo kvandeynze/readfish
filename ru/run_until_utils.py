@@ -200,7 +200,7 @@ class FastQMonitor(FastqHandler):
             if fastqfilelist:
                 parse_fastq_file(
                     fastqfilelist,
-                    self.args,
+                    self.args.toml['conditions']['reference'],
                     self.mapper,
                     self.centrifuge
                 )
@@ -234,18 +234,16 @@ class FastQMonitor(FastqHandler):
                 time.sleep(5)
 
 
-def parse_fastq_file(fastqfilelist, args, mapper, centrifuge):
+def parse_fastq_file(fastqfilelist, reference_loc, mapper, centrifuge):
     logger = logging.getLogger("ParseFastq")
-
     with open(os.devnull, 'w') as devnull:
-
         #This function will classify reads and update the mapper if it needs doing so.
         if centrifuge:
+            logger.info("Running Centrifuge")
             centrifuge.classify(fastqfilelist,mapper)
-
         if mapper:
-            if args.toml['conditions']['reference']:
-                print ("Gonna do me some mapping with {}".format(args.toml['conditions']['reference']))
+            if reference_loc:
+                logger.info("Mapping with {}.".format(reference_loc))
                 for file in fastqfilelist:
                     for desc, name, seq, qual in fastq_results(file):
                         sequence_list = ({"sequence": seq, "read_id": name})
