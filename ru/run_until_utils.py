@@ -6,10 +6,11 @@ import threading
 import time
 from watchdog.events import FileSystemEventHandler
 from ru.mapper import MappingServer as Map
+from ru.centrifuge import CentrifugeServer
 from ru.utils import nice_join, print_args, send_message, Severity, get_device
 
 
-def file_dict_of_folder_simple(path, args, logging, fastqdict):
+def file_dict_of_folder_simple(path, args, fastqdict):
     logger = logging.getLogger("ExistingFileProc")
 
     file_list_dict = dict()
@@ -33,8 +34,6 @@ def file_dict_of_folder_simple(path, args, logging, fastqdict):
                     file_list_dict[filepath] = os.stat(filepath).st_mtime
 
     logger.info("processed %s files" % (counter))
-
-
 
     logger.info("found %d existing fastq files to process first." % (len(file_list_dict)))
 
@@ -114,8 +113,8 @@ def fastq_results(fastq):
             except Exception as e:
                 print(e)
 
-
-def parse_fastq_file(fastqfilelist,args,logging,mapper):
+"""
+def parse_fastq_file(fastqfilelist,args,mapper,centrifuge):
     logger = logging.getLogger("ParseFastq")
     # Add the reference to the mapper
     #ToDo: This needs to be some kind of real reference name.
@@ -125,20 +124,19 @@ def parse_fastq_file(fastqfilelist,args,logging,mapper):
         for desc,name, seq,qual in fastq_results(file):
             sequence_list=({"sequence":seq,"read_id":name})
             mapper.map_sequence("test",sequence_list)
+"""
+
 
 class FastqHandler(FileSystemEventHandler):
 
-    def __init__(self, args,logging,rpc_connection):
+    def __init__(self, args, rpc_connection):
         self.args = args
         #self.messageport = messageport
         self.connection = rpc_connection
         self.logger = logging.getLogger("FastqHandler")
         self.running = True
         self.fastqdict = dict()
-        self.mapper=Map()
-        self.mapper.set_cov_target(args.depth)
-        self.creates = file_dict_of_folder_simple(self.args.watch, self.args, logging,
-                                                  self.fastqdict)
+        self.creates = file_dict_of_folder_simple(self.args.watch, self.args, self.fastqdict)
         self.t = threading.Thread(target=self.processfiles)
 
         try:
@@ -173,3 +171,98 @@ class FastqHandler(FileSystemEventHandler):
             self.logger.info("Processing file {}".format(event.dest_path))
             self.logger.debug("Modified file {}".format(event.dest_path))
             self.creates[event.dest_path] = time.time()
+
+
+
+class FastQMonitor(FastqHandler):
+    def __init__(self, args, rpc_connection, centrifuge=False, mapper=False):
+        if centrifuge:
+            self.centrifuge = CentrifugeServer(args)
+
+        else:
+            self.centrifuge = None
+        if mapper:
+            self.mapper=Map()
+            self.mapper.set_cov_target(args.depth)
+        else:
+            self.mapper = None
+        super().__init__(args=args, rpc_connection=rpc_connection)
+
+
+    def processfiles(self):
+        self.logger.info("Process Files Initiated")
+        self.counter = 0
+        self.targets = []
+
+        while self.running:
+            currenttime = time.time()
+
+            fastqfilelist = list()
+            for fastqfile, createtime in sorted(self.creates.items(), key=lambda x: x[1]):
+
+                delaytime = 0
+
+                # file created 5 sec ago, so should be complete. For simulations we make the time longer.
+                if (int(createtime) + delaytime < time.time()):
+                    self.logger.info(fastqfile)
+                    del self.creates[fastqfile]
+                    self.counter += 1
+                    fastqfilelist.append(fastqfile)
+
+                    # print (fastqfile,md5Checksum(fastqfile), "\n\n\n\n")
+            # as long as there are files within the args.watch directory to parse
+            if fastqfilelist:
+                parse_fastq_file(
+                    fastqfilelist,
+                    self.args,
+                    self.mapper,
+                    self.centrifuge
+                )
+                # This prints those targets with a coverage greater than the threshold set in the arguments
+                if self.mapper:
+                    targets = self.mapper.target_coverage().keys()
+                    print (self.mapper.report_coverage())
+                    if len(targets) > len(self.targets):
+                        updated_targets = set(targets) - set(self.targets)
+                        update_message = "Updating targets with {}".format(nice_join(updated_targets, conjunction="and"))
+                        self.logger.info(update_message)
+                        if not self.args.simulation:
+                            send_message(self.connection, update_message, Severity.WARN)
+                        write_new_toml(self.args, targets)
+                        self.targets = []
+                        self.targets = targets
+
+                    if len(self.targets) > 0 and self.mapper.check_complete():
+                        self.logger.info("Every target is covered at at least {}x".format(self.args.depth))
+                        if not self.args.simulation:
+                            self.connection.protocol.stop_protocol()
+                            send_message(
+                                self.connection,
+                                "Iter Align has stopped the run as all targets should be covered by at least {}x".format(
+                                    self.args.depth
+                                ),
+                                Severity.WARN,
+                            )
+
+            if currenttime + 5 > time.time():
+                time.sleep(5)
+
+
+def parse_fastq_file(fastqfilelist, args, mapper, centrifuge):
+    logger = logging.getLogger("ParseFastq")
+
+    with open(os.devnull, 'w') as devnull:
+
+        #This function will classify reads and update the mapper if it needs doing so.
+        if centrifuge:
+            centrifuge.classify(fastqfilelist,mapper)
+
+        if mapper:
+            if args.toml['conditions']['reference']:
+                print ("Gonna do me some mapping with {}".format(args.toml['conditions']['reference']))
+                for file in fastqfilelist:
+                    for desc, name, seq, qual in fastq_results(file):
+                        sequence_list = ({"sequence": seq, "read_id": name})
+                        mapper.map_sequence("test", sequence_list)
+
+
