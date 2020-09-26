@@ -15,10 +15,9 @@ import time
 import toml
 from watchdog.observers.polling import PollingObserver as Observer
 
-from ru.utils import nice_join, print_args, send_message, Severity, get_device
+from ru.utils import send_message, Severity, get_device
 from minknow_api.acquisition_pb2 import MinknowStatus
-from ru.run_until_utils import parse_fastq_file,write_new_toml
-from ru.run_until_utils import FastqHandler
+from ru.run_until_utils import FastQMonitor
 from ru.ru_gen import _cli as BASE
 from ru.ru_gen import run as dnrun
 from argparse import Namespace
@@ -34,24 +33,6 @@ DEFAULT_CORES = 2
 
 _help = "ReadFish and Run Until, using minimap2"
 _cli = BASE + (
-
-    #(
-    #    "--host",
-    #    dict(
-    #        metavar="HOST",
-    #        help="MinKNOW server host",
-    #        default=DEFAULT_SERVER_HOST,
-    #    ),
-    #),
-    #(
-    #    "--device",
-    #    dict(
-    #        metavar="DEVICE",
-    #        type=str,
-    #        help="Name of the sequencing position e.g. MS29042 or GA10000 etc.",
-    #        required=True,
-    #    ),
-    #),
 
     (
         "--watch",
@@ -88,101 +69,9 @@ _cli = BASE + (
             type=int,
         ),
     ),
-    #(
-    #    "--log-level",
-    #    dict(
-    #        metavar="LOG-LEVEL",
-    #        action="store",
-    #        default="info",
-    #        choices=LOG_LEVELS,
-    #        help="One of: {}".format(nice_join(LOG_LEVELS)),
-    #    ),
-    #),
-    #(
-    #    "--log-format",
-    #    dict(
-    #        metavar="LOG-FORMAT",
-    #        action="store",
-    #        default=DEFAULT_LOG_FORMAT,
-    #        help="A standard Python logging format string (default: {!r})".format(
-    #            DEFAULT_LOG_FORMAT.replace("%", "%%")
-    #        ),
-    #    ),
-    #),
-    #(
-    #    "--log-file",
-    #    dict(
-    #        metavar="LOG-FILE",
-    #        action="store",
-    #        default=None,
-    #        help="A filename to write logs to, or None to write to the standard stream (default: None)",
-    #    ),
-    #),
-    #(
-    #    "--toml",
-    #    dict(
-    #        metavar="TOML",
-    #        required=True,
-    #        help="The magic TOML file that will save your life?",
-    #        #type=toml.load,
-    #    ),
-    #),
 )
 
 
-class FastQMonitor(FastqHandler):
-    def __init__(self,args,logging,rpc_connection):
-        super().__init__(
-            args=args,
-            logging=logging,
-            #messageport=messageport,
-            rpc_connection=rpc_connection,
-        )
-
-    def processfiles(self):
-        self.logger.info("Process Files Initiated")
-        self.counter = 0
-        self.targets = []
-
-        while self.running:
-            currenttime = time.time()
-            fastqfilelist=list()
-            for fastqfile, createtime in sorted(self.creates.items(), key=lambda x: x[1]):
-                delaytime = 0
-                # file created 5 sec ago, so should be complete. For simulations we make the time longer.
-                if (int(createtime) + delaytime < time.time()):
-                    self.logger.info(fastqfile)
-                    del self.creates[fastqfile]
-                    self.counter +=1
-                    fastqfilelist.append(fastqfile)
-            parse_fastq_file(fastqfilelist,self.args,logging,self.mapper)
-            #print (self.mapper.report_coverage())
-            #This prints those targets with a coverage greater than the threshold set in the arguments
-            targets = self.mapper.target_coverage().keys()
-            if len(targets) > len(self.targets):
-                updated_targets = set(targets) - set(self.targets)
-                update_message = "Updating targets with {}".format(nice_join(updated_targets, conjunction="and"))
-                self.logger.info(update_message)
-                if not self.args.simulation:
-                    send_message(self.connection, update_message, Severity.WARN)
-                write_new_toml(self.args,targets)
-                self.targets = []
-                self.targets = targets
-
-            if len(self.targets)>0 and self.mapper.check_complete():
-                self.logger.info("Every target is covered at at least {}x".format(self.args.depth))
-                if not self.args.simulation:
-                    self.connection.protocol.stop_protocol()
-                    send_message(
-                        self.connection,
-                        "Iter Align has stopped the run as all targets should be covered by at least {}x".format(
-                            self.args.depth
-                        ),
-                        Severity.WARN,
-                    )
-
-            if currenttime+5 > time.time():
-                time.sleep(5)
 
 
 
@@ -245,16 +134,14 @@ def run(parser, args):
         #### Check if we know where data is being written to , if not... wait
         args.watch = connection.acquisition.get_acquisition_info().config_summary.reads_directory
 
+    ### Here we configure the code to run either iteralign or itercent. If centrifuge is False it will run iteralign.
+    event_handler = FastQMonitor(args, connection, centrifuge=False, mapper=True)
 
-
-    event_handler = FastQMonitor(args,logging,connection)
     # This block handles the fastq
     observer = Observer()
     print (args.watch)
     observer.schedule(event_handler, path=args.watch, recursive=True)
     observer.daemon = True
-
-
 
 
     try:
