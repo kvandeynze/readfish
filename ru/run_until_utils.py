@@ -113,19 +113,6 @@ def fastq_results(fastq):
             except Exception as e:
                 print(e)
 
-"""
-def parse_fastq_file(fastqfilelist,args,mapper,centrifuge):
-    logger = logging.getLogger("ParseFastq")
-    # Add the reference to the mapper
-    #ToDo: This needs to be some kind of real reference name.
-    mapper.add_reference("test",args.toml['conditions']['reference'])
-
-    for file in fastqfilelist:
-        for desc,name, seq,qual in fastq_results(file):
-            sequence_list=({"sequence":seq,"read_id":name})
-            mapper.map_sequence("test",sequence_list)
-"""
-
 
 class FastqHandler(FileSystemEventHandler):
 
@@ -178,7 +165,6 @@ class FastQMonitor(FastqHandler):
     def __init__(self, args, rpc_connection, centrifuge=False, mapper=False):
         if centrifuge:
             self.centrifuge = CentrifugeServer(args)
-
         else:
             self.centrifuge = None
         if mapper:
