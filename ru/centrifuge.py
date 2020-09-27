@@ -161,3 +161,4 @@ class CentrifugeServer():
             mapper.load_index("test",self.path + self.prefix + self.gfasta)
             self.toml['conditions']['reference']=self.path + self.prefix + self.gfasta
             self.logger.info("Updated reference is {}".format(self.toml['conditions']['reference']))
+        return self.toml['conditions']['reference']
