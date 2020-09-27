@@ -85,7 +85,6 @@ def run(parser, args):
     args_copy = Namespace(**vars(args))
     args.tomlfile = args.toml
     args.toml = toml.load(args.toml)
-    print (args)
 
     # TODO: Move logging config to separate configuration file
     # set up logging to file
@@ -135,7 +134,7 @@ def run(parser, args):
         args.watch = connection.acquisition.get_acquisition_info().config_summary.reads_directory
 
     ### Here we configure the code to run either iteralign or itercent. If centrifuge is False it will run iteralign.
-    event_handler = FastQMonitor(args, connection, centrifuge=False, mapper=True)
+    event_handler = FastQMonitor(args, connection, centrifuge=False, mapper=True,rununtil=True)
 
     # This block handles the fastq
     observer = Observer()
@@ -149,10 +148,11 @@ def run(parser, args):
         observer.start()
         logger.info("FastQ Monitoring Running.")
 
-        dnrun(parser, args_copy)
-
-        while 1:
-            time.sleep(1)
+        if not args.simulation:
+            dnrun(parser, args_copy)
+        else:
+            while 1:
+                time.sleep(1)
 
     except KeyboardInterrupt:
 
