@@ -22,6 +22,8 @@ from watchdog.observers.polling import PollingObserver as Observer
 
 from ru.utils import nice_join, print_args, send_message, Severity, get_device
 from ru.run_until_utils import FastQMonitor
+from ru.ru_gen import _cli as BASE
+from ru.ru_gen import run as dnrun
 from minknow_api.acquisition_pb2 import MinknowStatus
 
 DEFAULT_SERVER_HOST = "127.0.0.1"
@@ -43,15 +45,7 @@ DEFAULT_COVERAGE_FILE = "coverage.tsv"
 DEFAULT_SEQUENCE_LENGTH = 100000
 
 _help = "ReadFish and Run Until, using centrifuge"
-_cli = (
-    (
-        "--host",
-        dict(
-            metavar="HOST",
-            help="MinKNOW server host",
-            default=DEFAULT_SERVER_HOST,
-        ),
-    ),
+_cli = BASE + (
     (
         "--watch",
         dict(
@@ -70,14 +64,6 @@ _cli = (
         ),
     ),
     (
-        "--device",
-        dict(
-            required=True,
-            action="store",
-            help="The sequencing position being addressed"
-        ),
-    ),
-    (
         "--depth",
         dict(
             metavar="DEPTH",
@@ -93,36 +79,6 @@ _cli = (
             help="Set the number of default threads to use for threaded tasks (default {})".format(DEFAULT_CORES),
             default=DEFAULT_CORES,
             type=int,
-        ),
-    ),
-    (
-        "--log-level",
-        dict(
-            metavar="LOG-LEVEL",
-            action="store",
-            default="info",
-            choices=LOG_LEVELS,
-            help="One of: {}".format(nice_join(LOG_LEVELS)),
-        ),
-    ),
-    (
-        "--log-format",
-        dict(
-            metavar="LOG-FORMAT",
-            action="store",
-            default=DEFAULT_LOG_FORMAT,
-            help="A standard Python logging format string (default: {!r})".format(
-                DEFAULT_LOG_FORMAT.replace("%", "%%")
-            ),
-        ),
-    ),
-    (
-        "--log-file",
-        dict(
-            metavar="LOG-FILE",
-            action="store",
-            default=None,
-            help="A filename to write logs to, or None to write to the standard stream (default: None)",
         ),
     ),
     (
@@ -254,19 +210,7 @@ _cli = (
             default=DEFAULT_COVERAGE_FILE,
         ),
     ),
-    (
-        "--toml",
-        dict(
-            metavar="TOML",
-            required=True,
-            help="The magic TOML file that will save your life?",
-            # type=toml.load,
-        ),
-    ),
 )
-
-
-
 
 
 def main():
@@ -279,8 +223,6 @@ def run(parser, args):
 
     args.tomlfile = args.toml
     args.toml = toml.load(args.toml)
-
-    print(args)
 
     # TODO: Move logging config to separate configuration file
     # set up logging to file
@@ -328,7 +270,7 @@ def run(parser, args):
             sys.exit(1)
 
         #send_message_port("Iteralign Connected to MinKNOW", args.host, messageport)
-        send_message(connection, "Iteralign Connected to MinKNOW.", Severity.WARN)
+        send_message(connection, "ReadFish Centriuge Connected to MinKNOW.", Severity.WARN)
 
         logger.info("Loaded RPC")
         while connection.acquisition.current_status().status != MinknowStatus.PROCESSING:
@@ -341,7 +283,7 @@ def run(parser, args):
 
 
     ### Here we configure the code to run either iteralign or itercent. If centrifuge is False it will run iteralign.
-    event_handler = FastQMonitor(args, connection,centrifuge=True,mapper=True)
+    event_handler = FastQMonitor(args, connection,centrifuge=True,mapper=True,rununtil=False)
     # This block handles the fastq
     observer = Observer()
     observer.schedule(event_handler, path=args.watch, recursive=True)
@@ -351,8 +293,12 @@ def run(parser, args):
 
         observer.start()
         logger.info("FastQ Monitoring Running.")
-        while 1:
-            time.sleep(1)
+
+        if not args.simulation:
+            dnrun(parser, args_copy)
+        else:
+            while 1:
+                time.sleep(1)
 
     except KeyboardInterrupt:
 
