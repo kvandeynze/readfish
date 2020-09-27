@@ -97,7 +97,7 @@ class MappingServer():
         coverage_results=[]
         for refname in self.coverage:
             if self.coverage[refname]["length"]>0:
-                coverage_results.append({"refname":refname,"coverage":self.coverage[refname]["bases"]/self.coverage[refname]["length"]})
+                coverage_results.append({"refname":refname,"bases":self.coverage[refname]["bases"], "coverage":self.coverage[refname]["bases"]/self.coverage[refname]["length"]})
         return coverage_results
 
     def target_coverage(self):
@@ -158,6 +158,7 @@ class MappingServer():
             results.append("{}\t{}\t{}".format(sequence["read_id"],len(sequence["sequence"]),hit))
             if trackcov:
                 #### How do we handle multiple hits?
+                #print ("updating coverage {} {}".format(hit.ctg,hit.mlen))
                 self.increment_ref_coverage(hit.ctg,hit.mlen)
         #print(self.report_coverage())
         return results
