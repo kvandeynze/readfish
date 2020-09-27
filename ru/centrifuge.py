@@ -18,27 +18,40 @@ class CentrifugeServer():
     Long term goal is that this will allow streaming of individual reads or chunks of reads to a continuously open centrifuge classifier.
     """
 
-    def __init__(self,args):
+    def __init__(self, threshold=0,plasmids=None,csummary=None,path=None,prefix=None,gfasta=None,seqlength=5000,references=None,toml=None,threads=1,cindex=None,creport=None):
         print ("Configuring centrifuge")
-        self.args = args
         self.tax_data = dict()
-        self.threshold = self.args.threshold
+        self.threshold = threshold
         self.new_targets = list()
         self.all_targets = set()
         self.ref_lookup = dict()
+
+        self.plasmids_dict = dict()
+        self.plasmids=plasmids
+        self.csummary=csummary
+        self.path=path
+        self.prefix=prefix
+        self.gfasta=gfasta
+        self.seqlength=seqlength
+        self.references=references
+        self.toml=toml
+        self.threads=threads
+        self.cindex=cindex
+        self.creport=creport
+
         self._store_urls()
-        self.plasmidsd = dict()
-        if self.args.plasmids:
-            self.plasmidsd = self._store_plasmids()
+
+        if self.plasmids:
+            self.plasmids_dict = self._store_plasmids()
         # ToDO Do we need this? Perhaps - it accepts a list of sequences that you might want to reject up front.
-        if self.args.references:
-            for taxID in self.args.references:
+        if self.references:
+            for taxID in self.references:
                 self.new_targets.append(str(taxID))
 
 
     def _store_plasmids(self):
         r = ("name", "path")
-        with open(self.args.csummary) as f:
+        with open(self.csummary) as f:
             d = {int(x[0]): dict(zip(r, x[1:])) for i, l in enumerate(f) for x in (l.strip().split("\t"),)
                  if i > 0}
 
@@ -46,12 +59,11 @@ class CentrifugeServer():
 
 
     def _store_urls(self):
-        with open(self.args.csummary, newline='') as f:
+        with open(self.csummary, newline='') as f:
             reader = csv.reader(f)
             next(reader)
             for row in reader:
                 taxID, name,url = row[0].split("\t")
-                #print (taxID,name,url)
                 self.ref_lookup[taxID]=url
 
 
@@ -66,21 +78,21 @@ class CentrifugeServer():
             print("Closing script")
 
         compressed_file = BytesIO(response.read())
-        with gzip.open(compressed_file, "rt") as fh, gzip.open(self.args.path + self.args.prefix + self.args.gfasta,
+        with gzip.open(compressed_file, "rt") as fh, gzip.open(self.path + self.prefix + self.gfasta,
                                                                "at") as fasta_seq:
            for seq_record in SeqIO.parse(fh, "fasta"):
-                if len(seq_record) > self.args.seqlength:
+                if len(seq_record) > self.seqlength:
                     lengths[seq_record.id] = len(seq_record)
                     SeqIO.write(seq_record, fasta_seq, "fasta")
 
-        if self.args.plasmids:
+        if self.plasmids:
             logging.info("Obtaining the plasmids for the following taxids: {}".format(taxID))
 
-            with gzip.open(self.args.plasmids, "rt") as fh, gzip.open(self.args.path + self.args.prefix + self.args.gfasta,
+            with gzip.open(self.plasmids, "rt") as fh, gzip.open(self.path + self.prefix + self.gfasta,
                                                                          "at") as fasta_seq:
                 for seq_record in SeqIO.parse(fh, "fasta"):
-                    if taxID in self.plasmidsd.keys():
-                        if self.plasmidsd[taxID]["name"] in seq_record.description and len(seq_record) > self.args.seqlength:
+                    if taxID in self.plasmids_dict.keys():
+                        if self.plasmids_dict[taxID]["name"] in seq_record.description and len(seq_record) > self.seqlength:
                             lengths[seq_record.id] = len(seq_record)
                             SeqIO.write(seq_record, fasta_seq, "fasta")
 
@@ -107,11 +119,11 @@ class CentrifugeServer():
         # convert the 'fastqfileList' into a string valid for the list of fastq files to be read by centrifuge
         fastq_str = ",".join(fastqfileList)
 
-        print ("Reference is {}.".format(self.args.toml['conditions']['reference']))
+        print ("Reference is {}.".format(self.toml['conditions']['reference']))
 
         # centrifuge command to classify reads in the fastq files found by watchdog
-        centrifuge_cmd = "centrifuge -p {} -x {} -q {}".format(self.args.threads,
-                                                               self.args.cindex,
+        centrifuge_cmd = "centrifuge -p {} -x {} -q {}".format(self.threads,
+                                                               self.cindex,
                                                                fastq_str
                                                                )
 
@@ -132,7 +144,7 @@ class CentrifugeServer():
         print ("finished that subprocess")
 
         #First grab and store information on the genomes seen.
-        with open(self.args.creport, newline='') as f:
+        with open(self.creport, newline='') as f:
             reader = csv.reader(f)
             next(reader)
             for row in reader:
@@ -159,9 +171,9 @@ class CentrifugeServer():
 
             #Make a new reference
 
-            mapper.load_index("test",self.args.path + self.args.prefix + self.args.gfasta)
-            self.args.toml['conditions']['reference']=self.args.path + self.args.prefix + self.args.gfasta
-            print ("Updated reference is {}".format(self.args.toml['conditions']['reference']))
+            mapper.load_index("test",self.path + self.prefix + self.gfasta)
+            self.toml['conditions']['reference']=self.path + self.prefix + self.gfasta
+            print ("Updated reference is {}".format(self.toml['conditions']['reference']))
         #return file handle and instruct to make a new reference IF we need to do that.
 
 

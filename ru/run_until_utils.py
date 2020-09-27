@@ -164,7 +164,20 @@ class FastqHandler(FileSystemEventHandler):
 class FastQMonitor(FastqHandler):
     def __init__(self, args, rpc_connection, centrifuge=False, mapper=False):
         if centrifuge:
-            self.centrifuge = CentrifugeServer(args)
+            self.centrifuge = CentrifugeServer(
+                threshold=args.threshold,
+                plasmids=args.plasmids,
+                csummary=args.csummary,
+                path=args.path,
+                prefix=args.prefix,
+                gfasta=args.gfasta,
+                seqlength=args.seqlength,
+                references=args.references,
+                toml=args.toml,
+                threads=args.threads,
+                cindex=args.cindex,
+                creport=args.creport,
+            )
         else:
             self.centrifuge = None
         if mapper:
