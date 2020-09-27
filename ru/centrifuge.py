@@ -19,13 +19,13 @@ class CentrifugeServer():
     """
 
     def __init__(self, threshold=0,plasmids=None,csummary=None,path=None,prefix=None,gfasta=None,seqlength=5000,references=None,toml=None,threads=1,cindex=None,creport=None):
-        print ("Configuring centrifuge")
+        self.logger = logging.getLogger("CentrifugeServer")
+        self.logger.info("Configuring Centrifuge Server.")
         self.tax_data = dict()
         self.threshold = threshold
         self.new_targets = list()
         self.all_targets = set()
         self.ref_lookup = dict()
-
         self.plasmids_dict = dict()
         self.plasmids=plasmids
         self.csummary=csummary
@@ -38,9 +38,7 @@ class CentrifugeServer():
         self.threads=threads
         self.cindex=cindex
         self.creport=creport
-
         self._store_urls()
-
         if self.plasmids:
             self.plasmids_dict = self._store_plasmids()
         # ToDO Do we need this? Perhaps - it accepts a list of sequences that you might want to reject up front.
@@ -54,7 +52,6 @@ class CentrifugeServer():
         with open(self.csummary) as f:
             d = {int(x[0]): dict(zip(r, x[1:])) for i, l in enumerate(f) for x in (l.strip().split("\t"),)
                  if i > 0}
-
         return d
 
 
@@ -66,16 +63,15 @@ class CentrifugeServer():
                 taxID, name,url = row[0].split("\t")
                 self.ref_lookup[taxID]=url
 
-
     def _download_references(self, taxID):
         lengths = {}
         link = self.ref_lookup[taxID]
-        print("Attempting to download: {}".format(link), end="\n")
+        self.logger.info("Attempting to download: {}".format(link))
         try:
             response = request.urlopen(link)
         except url_error.URLError as e:
-            print(e)
-            print("Closing script")
+            self.logger.debug(e)
+            self.logger.debug("Closing script")
 
         compressed_file = BytesIO(response.read())
         with gzip.open(compressed_file, "rt") as fh, gzip.open(self.path + self.prefix + self.gfasta,
@@ -86,7 +82,7 @@ class CentrifugeServer():
                     SeqIO.write(seq_record, fasta_seq, "fasta")
 
         if self.plasmids:
-            logging.info("Obtaining the plasmids for the following taxids: {}".format(taxID))
+            self.logger.info("Obtaining the plasmids for the following taxids: {}".format(taxID))
 
             with gzip.open(self.plasmids, "rt") as fh, gzip.open(self.path + self.prefix + self.gfasta,
                                                                          "at") as fasta_seq:
@@ -95,9 +91,7 @@ class CentrifugeServer():
                         if self.plasmids_dict[taxID]["name"] in seq_record.description and len(seq_record) > self.seqlength:
                             lengths[seq_record.id] = len(seq_record)
                             SeqIO.write(seq_record, fasta_seq, "fasta")
-
-        logging.info("Genome file generated in {}".format(fasta_seq))
-
+        self.logger.info("Genome file generated in {}".format(fasta_seq))
         return lengths
 
     def _add_taxon(self,taxID,name,genomeSize,numUniqueReads):
@@ -118,16 +112,15 @@ class CentrifugeServer():
     def classify(self,fastqfileList,mapper):
         # convert the 'fastqfileList' into a string valid for the list of fastq files to be read by centrifuge
         fastq_str = ",".join(fastqfileList)
-
-        print ("Reference is {}.".format(self.toml['conditions']['reference']))
-
+        if self.toml['conditions']['reference']:
+            self.logger.info("Reference is {}.".format(self.toml['conditions']['reference']))
+        else:
+            self.logger.info("No reference yet loaded.")
         # centrifuge command to classify reads in the fastq files found by watchdog
         centrifuge_cmd = "centrifuge -p {} -x {} -q {}".format(self.threads,
                                                                self.cindex,
                                                                fastq_str
                                                                )
-
-
         # subprocess for 'centrifuge_cmd'
         proc = subprocess.Popen(
             centrifuge_cmd,
@@ -140,9 +133,6 @@ class CentrifugeServer():
         )
         out, err = proc.communicate()
         proc.stdout.close()
-
-        print ("finished that subprocess")
-
         #First grab and store information on the genomes seen.
         with open(self.creport, newline='') as f:
             reader = csv.reader(f)
@@ -151,7 +141,6 @@ class CentrifugeServer():
                 #print(row)
                 name, taxID, taxRank, genomeSize, numReads, numUniqueReads, abundance = row[0].split("\t")
                 self._add_taxon(taxID,name,genomeSize,numUniqueReads)
-
         """
         #This bit of code is only needed if we need access to the readIDs - which we do not!
         for line in out.splitlines()[1:-1]:
@@ -167,16 +156,8 @@ class CentrifugeServer():
         if self.new_targets:
             while len(self.new_targets) > 0:
                 target = self.new_targets.pop()
-                print(self._download_references(target))
-
+                self.logger.info(self._download_references(target))
             #Make a new reference
-
             mapper.load_index("test",self.path + self.prefix + self.gfasta)
             self.toml['conditions']['reference']=self.path + self.prefix + self.gfasta
-            print ("Updated reference is {}".format(self.toml['conditions']['reference']))
-        #return file handle and instruct to make a new reference IF we need to do that.
-
-
-
-
-        #name,taxID,taxRank,genomeSize,numReads,numUniqueReads,abundance =
+            self.logger.info("Updated reference is {}".format(self.toml['conditions']['reference']))
