@@ -202,6 +202,7 @@ def simple_analysis(
                 mapper = CustomMapper(new_reference)
                 # Log on success
                 logger.info("Reloaded mapper")
+                send_message(client.connection, "Mapper reloaded. ReadFish restarted.", Severity.INFO)
 
                 # If we've reloaded a reference, delete the previous one
                 if old_reference:
