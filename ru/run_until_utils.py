@@ -162,7 +162,7 @@ class FastqHandler(FileSystemEventHandler):
 
 
 class FastQMonitor(FastqHandler):
-    def __init__(self, args, rpc_connection, centrifuge=False, mapper=False):
+    def __init__(self, args, rpc_connection, centrifuge=False, mapper=False,rununtil=False):
         if centrifuge:
             self.centrifuge = CentrifugeServer(
                 threshold=args.threshold,
@@ -185,6 +185,7 @@ class FastQMonitor(FastqHandler):
             self.mapper.set_cov_target(args.depth)
         else:
             self.mapper = None
+        self.rununtil=rununtil
         super().__init__(args=args, rpc_connection=rpc_connection)
 
 
@@ -232,16 +233,26 @@ class FastQMonitor(FastqHandler):
                         self.targets = targets
 
                     if len(self.targets) > 0 and self.mapper.check_complete():
+
                         self.logger.info("Every target is covered at at least {}x".format(self.args.depth))
                         if not self.args.simulation:
-                            self.connection.protocol.stop_protocol()
-                            send_message(
-                                self.connection,
-                                "Iter Align has stopped the run as all targets should be covered by at least {}x".format(
-                                    self.args.depth
-                                ),
-                                Severity.WARN,
-                            )
+                            if self.rununtil:
+                                self.connection.protocol.stop_protocol()
+                                send_message(
+                                    self.connection,
+                                    "ReadFish has stopped the run as all targets should be covered by at least {}x".format(
+                                        self.args.depth
+                                    ),
+                                    Severity.WARN,
+                                )
+                            else:
+                                send_message(
+                                    self.connection,
+                                    "ReadFish reports all current targets should be covered by at least {}x".format(
+                                        self.args.depth
+                                    ),
+                                    Severity.WARN,
+                                )
 
             if currenttime + 5 > time.time():
                 time.sleep(5)
@@ -253,10 +264,11 @@ def parse_fastq_file(fastqfilelist, reference_loc, mapper, centrifuge):
         #This function will classify reads and update the mapper if it needs doing so.
         if centrifuge:
             logger.info("Running Centrifuge")
-            centrifuge.classify(fastqfilelist,mapper)
+            reference_loc = centrifuge.classify(fastqfilelist,mapper)
         if mapper:
             if reference_loc:
                 logger.info("Mapping with {}.".format(reference_loc))
+                mapper.add_reference("test",reference_loc)
                 for file in fastqfilelist:
                     for desc, name, seq, qual in fastq_results(file):
                         sequence_list = ({"sequence": seq, "read_id": name})
