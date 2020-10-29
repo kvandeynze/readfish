@@ -162,8 +162,8 @@ def simple_analysis(
         # Caller is deepnano2
         caller = DeepNanoCaller(
             network_type=caller_kwargs["network_type"],
-            beam_size=5,
-            beam_cut_threshold=0.01,
+            beam_size=caller_kwargs.get("beam_size", 5),
+            beam_cut_threshold=caller_kwargs.get("beam_cut_threshold", 0.01),
             # This is an optional argument that defaults to two
             #   Should consider if this will break
             threads=caller_kwargs.get("threads", 2),

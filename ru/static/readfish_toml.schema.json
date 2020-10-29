@@ -37,7 +37,13 @@
                             "type": "string"
                         },
                         "threads": {
-                            "type": "integer"
+                            "type": "number"
+                        },
+                        "beam_size":{
+                            "type": "number"
+                        },
+                        "beam_cut_threshold" : {
+                            "type": "number"
                         }
                     },
                     "required": [
