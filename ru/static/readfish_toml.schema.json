@@ -11,22 +11,37 @@
         },
         "caller_settings": {
             "type": "object",
-            "additionalProperties": false,
-            "properties": {
-                "config_name": {
-                    "type": "string"
+            "oneOf": [
+                {
+                    "properties": {
+                        "config_name": {
+                            "type": "string"
+                        },
+                        "host": {
+                            "type": "string"
+                        },
+                        "port": {
+                            "type": "number"
+                        }
+                    },
+                    "required": [
+                        "config_name",
+                        "host",
+                        "port"
+                    ],
+                    "additionalProperties": false
                 },
-                "host": {
-                    "type": "string"
-                },
-                "port": {
-                    "type": "number"
+                {
+                    "properties": {
+                        "network_type": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "network_type"
+                    ],
+                    "additionalProperties": false
                 }
-            },
-            "required": [
-                "config_name",
-                "host",
-                "port"
             ]
         },
         "conditions": {

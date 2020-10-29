@@ -18,7 +18,7 @@ import toml
 
 from ru.arguments import BASE_ARGS
 from ru.basecall import Mapper as CustomMapper
-from ru.basecall import GuppyCaller as Caller
+from ru.basecall import GuppyCaller, DeepNanoCaller
 from ru.utils import (
     print_args,
     get_run_info,
@@ -152,10 +152,24 @@ def simple_analysis(
         fh.write("# In the future this file may become a CSV file.\n")
         toml.dump(d, fh)
 
-    caller = Caller(
-        address="{}:{}".format(caller_kwargs["host"], caller_kwargs["port"]),
-        config=caller_kwargs["config_name"],
-    )
+    if all(field in caller_kwargs for field in ("congig_name", "host", "port")):
+        # Caller is guppy
+        caller = GuppyCaller(
+            address="{}:{}".format(caller_kwargs["host"], caller_kwargs["port"]),
+            config=caller_kwargs["config_name"],
+        )
+    elif all(field in caller_kwargs for field in ("network_type")):
+        # Caller is deepnano2
+        caller = DeepNanoCaller(
+            network_type=caller_kwargs["network_type"],
+            beam_size=5,
+            beam_cut_threshold=0.01,
+            threads=2,
+        )
+        caller.start()
+    else:
+        raise RuntimeError("Cannot determine base caller to use")
+
     # What if there is no reference or an empty MMI
 
     decisiontracker = DecisionTracker()
@@ -290,17 +304,11 @@ def simple_analysis(
 
             # This is an analysis channel
             # Below minimum chunks
-            if (
-                tracker[channel][read_number]
-                <= conditions[run_info[channel]].min_chunks
-            ):
+            if tracker[channel][read_number] <= conditions[run_info[channel]].min_chunks:
                 below_threshold = True
 
             # Greater than or equal to maximum chunks
-            if (
-                tracker[channel][read_number]
-                >= conditions[run_info[channel]].max_chunks
-            ):
+            if tracker[channel][read_number] >= conditions[run_info[channel]].max_chunks:
                 exceeded_threshold = True
 
             # No mappings
