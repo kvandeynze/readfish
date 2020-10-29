@@ -164,7 +164,9 @@ def simple_analysis(
             network_type=caller_kwargs["network_type"],
             beam_size=5,
             beam_cut_threshold=0.01,
-            threads=2,
+            # This is an optional argument that defaults to two
+            #   Should consider if this will break
+            threads=caller_kwargs.get("threads", 2),
         )
         caller.start()
     else:

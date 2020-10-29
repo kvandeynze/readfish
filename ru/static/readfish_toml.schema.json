@@ -35,6 +35,9 @@
                     "properties": {
                         "network_type": {
                             "type": "string"
+                        },
+                        "threads": {
+                            "type": "integer"
                         }
                     },
                     "required": [
