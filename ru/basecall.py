@@ -14,8 +14,14 @@ import queue
 import mappy as mp
 import numpy as np
 
-from pyguppy_client_lib.pyclient import PyGuppyClient
-from pyguppy_client_lib.helper_functions import package_read
+try:
+    from pyguppy_client_lib.pyclient import PyGuppyClient
+    from pyguppy_client_lib.helper_functions import package_read
+
+    pyguppy_available = True
+except ImportError:
+    pyguppy_available = False
+
 
 try:
     import deepnano2
@@ -147,7 +153,7 @@ class DeepNanoCaller(Caller):
         -------
         """
         for channel, read in reads:
-            if decided_reads[channel] == read.id:
+            if decided_reads.get(channel, "") == read.id:
                 continue
             yield {
                 "signal": np.frombuffer(read.raw_data, dtype=signal_dtype),

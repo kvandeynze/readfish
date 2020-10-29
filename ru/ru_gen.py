@@ -158,7 +158,7 @@ def simple_analysis(
             address="{}:{}".format(caller_kwargs["host"], caller_kwargs["port"]),
             config=caller_kwargs["config_name"],
         )
-    elif all(field in caller_kwargs for field in ("network_type")):
+    elif all(field in caller_kwargs for field in ("network_type",)):
         # Caller is deepnano2
         caller = DeepNanoCaller(
             network_type=caller_kwargs["network_type"],
@@ -456,6 +456,18 @@ def run(parser, args):
     )
     live_toml = Path("{}_live".format(args.toml))
 
+    # TODO: this check is duplicated in the analysis function, we can instead
+    #       pass the caller object
+    calibrated_data = False
+    if all(field in caller_kwargs for field in ("congig_name", "host", "port")):
+        # Caller is guppy
+        calibrated_data = False
+    elif all(field in caller_kwargs for field in ("network_type",)):
+        # Caller is deepnano2
+        calibrated_data = True
+    else:
+        raise RuntimeError("Cannot determine base caller to use")
+
     # Load Minimap2 index
     logger.info("Initialising minimap2 mapper")
     mapper = CustomMapper(reference)
@@ -468,6 +480,7 @@ def run(parser, args):
         mk_port=position.description.rpc_ports.insecure,
         filter_strands=True,
         cache_type=AccumulatingCache,
+        calibrated_signal=calibrated_data,
     )
 
     send_message(
