@@ -34,7 +34,7 @@
                 {
                     "properties": {
                         "network_type": {
-                            "type": "string",
+                            "type": "string"
                         },
                         "threads": {
                             "type": "number"
