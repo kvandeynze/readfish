@@ -85,7 +85,7 @@ class Caller:
 
 class DeepNanoCaller(Caller):
     def __init__(
-        self, network_type="56", beam_size=5, beam_cut_threshold=0.01, threads=2
+        self, network_type="56", beam_size=5, beam_cut_threshold=0.01, threads=2, signal_slice=None,
     ):
         if not deepnano2_available:
             # Could use sys.exit here instead
@@ -98,6 +98,7 @@ class DeepNanoCaller(Caller):
             deepnano2.__path__[0], "weights", "rnn{}.txt".format(self.net_type)
         )
         self.threads = threads
+        self.signal_slice = signal_slice
         # TODO: add max queue size for _in and out
         self._in, self._out = Queue(), Queue()
         args = (self._in, self._out, self.net_type, self.net_path, self.beam, self.cut)
@@ -142,21 +143,27 @@ class DeepNanoCaller(Caller):
                 break
         return items
 
-    @staticmethod
-    def pack_read(reads, signal_dtype, decided_reads):
-        """
+    def pack_read(self, reads, signal_dtype, decided_reads):
+        """Pack a read for calling with deepnano
+
         Parameters
         ----------
         reads
         signal_dtype
-        Returns
+        decided_reads
+
+        Yields
         -------
+        Dicts of packed reads
         """
         for channel, read in reads:
             if decided_reads.get(channel, "") == read.id:
                 continue
+            signal = np.frombuffer(read.raw_data, dtype=signal_dtype)
+            if self.signal_slice is not None:
+                signal = signal[-self.signal_slice:]
             yield {
-                "signal": np.frombuffer(read.raw_data, dtype=signal_dtype),
+                "signal": signal,
                 "read_id": read.id,
                 "channel": channel,
                 "read_number": read.number,
@@ -186,7 +193,7 @@ class DeepNanoCaller(Caller):
         quality : str
         """
         done = 0
-        sent = self.pass_data(self.pack_read(reads, signal_dtype, decided_reads))
+        sent = self.pass_data(self.pack_read(reads, signal_dtype, self.signal_slice, decided_reads))
 
         while done < sent:
             res = self.get_completed()

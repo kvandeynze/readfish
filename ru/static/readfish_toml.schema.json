@@ -34,7 +34,7 @@
                 {
                     "properties": {
                         "network_type": {
-                            "type": "string"
+                            "type": "string",
                         },
                         "threads": {
                             "type": "number"
@@ -44,6 +44,9 @@
                         },
                         "beam_cut_threshold" : {
                             "type": "number"
+                        },
+                        "max_signal_slice": {
+                            "type": "integer"
                         }
                     },
                     "required": [
