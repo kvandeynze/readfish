@@ -193,7 +193,7 @@ class DeepNanoCaller(Caller):
         quality : str
         """
         done = 0
-        sent = self.pass_data(self.pack_read(reads, signal_dtype, self.signal_slice, decided_reads))
+        sent = self.pass_data(self.pack_read(reads, signal_dtype, decided_reads))
 
         while done < sent:
             res = self.get_completed()
