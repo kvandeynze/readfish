@@ -1,6 +1,17 @@
 import mappy as mp
 import time
 import threading
+from pathlib import Path
+import toml
+
+from ru.utils import (
+    print_args,
+    get_run_info,
+    between,
+    setup_logger,
+    describe_experiment,
+)
+
 
 # a = mp.Aligner("test/MT-human.fa")  # load or build index
 # if not a: raise Exception("ERROR: failed to load/build index")
@@ -22,14 +33,55 @@ class MappingServer:
         self.coverage = (
             dict()
         )  # A holder which will track coverage of each sequence in a reference
+        self.targets = dict()
         self.mappingobjects = dict()
         self.interval = 1800  # Check every 30 minutes to see if a reference has been used - delete it if it hasn't been used.
         self.cov_target = 0
+        self.conditions = None
+        self.run_info = None
 
         databasemonitor = threading.Thread(target=self.databasemonitor, args=())
         databasemonitor.daemon = True  # Daemonize thread
         databasemonitor.start()
         # self.references.add("camel")
+
+    def parse_targets(self,tomlfile):
+        self.targets_to_skip = dict()
+        self.run_info, self.conditions, self.reference, self.caller_kwargs = get_run_info(
+            tomlfile, num_channels=512
+        )
+        self.live_toml = Path("{}_live".format(tomlfile))
+        self.tomlfile = tomlfile
+        print (self.conditions)
+        target_list = []
+        for condition in self.conditions:
+            print (condition)
+            print (condition.coords)
+            for strand in condition.coords:
+                for chr in condition.coords[strand]:
+                    for coord in condition.coords[strand][chr]:
+                        print ("{},{},{},{}".format(chr,coord[0],coord[1],strand))
+                        target_list.append("{},{},{},{}".format(chr,coord[0],coord[1],strand))
+
+        self.write_new_toml(target_list,self.tomlfile)
+        #do we care about strand for tracking coverage do we care about orientation.
+        #for
+
+    def write_new_toml(self,targets,tomlfile):
+        new_toml = toml.load(tomlfile)
+        for k in new_toml["conditions"].keys():
+            curcond = new_toml["conditions"].get(k)
+            if isinstance(curcond, dict):
+                # newtargets = targets
+                # newtargets.extend(curcond["targets"])
+
+                # newtargets = list(dict.fromkeys(newtargets))
+                # curcond["targets"]=list(set(newtargets))
+                curcond["targets"] = targets
+
+        with open(self.live_toml, "w") as f:
+            toml.dump(new_toml, f)
+
 
     def set_cov_target(self, coverage):
         self.cov_target = coverage
@@ -107,6 +159,8 @@ class MappingServer:
                         / self.coverage[refname]["length"],
                     }
                 )
+        if self.conditions:
+            print (self.targets)
         return coverage_results
 
     def target_coverage(self):
@@ -164,6 +218,10 @@ class MappingServer:
         # print (self.coverage)
         # print (len(self.coverage))
 
+    def check_tracking(self):
+        if self.conditions:
+            return True
+
     def map_sequence(self, reference, sequence, trackcov=True):
         """
         This is a fast mapper that takes a sequence and returns the mapped sequence.
@@ -183,8 +241,89 @@ class MappingServer:
                 #### How do we handle multiple hits?
                 # print ("updating coverage {} {}".format(hit.ctg,hit.mlen))
                 self.increment_ref_coverage(hit.ctg, hit.mlen)
+                if self.conditions:
+                    for item in sequence["desc"].split():
+                        if item.startswith('ch='):
+                            channel = int(item.split("=")[1])
+                            condition = self.run_info[channel]
+                            result = False
+                            #print (condition,hit.strand,hit.ctg,hit.r_st,hit.r_en,hit.mlen)
+                            if hit.strand == 1:
+                                result = self.check_target('+',hit.ctg,hit.mlen,hit.r_st,condition)
+                                #if result:
+                                #    print ("forward match found")
+                                pass
+                            else:
+                                result = self.check_target('-', hit.ctg, hit.mlen, hit.r_en, condition)
+                                #if result:
+                                #    print ("reverse match found")
+                                pass
+                            if not result:
+                                #print ("no mathc found")
+                                pass
+
         # print(self.report_coverage())
         return results
+
+    def check_target(self,strand,ctg,length,coord,cond):
+        """coord_match = any(
+            between(int(coord), c)
+                for c in self.conditions[cond]
+                .coords.get(strand, {})
+                .get(ctg, [])
+        )"""
+        coord_match = [
+            c
+            for c in self.conditions[cond].coords.get(strand, {}).get(ctg, [])
+            if between(int(coord), c)
+        ]
+
+        if coord_match:
+
+            left_coord = coord_match[0][0]
+            target_length = coord_match[0][1]-coord_match[0][0]+1
+
+            #Going to ignore strand - this assumes the targets overlap. For now we will keep it in.
+            #ToDo: properly handle stranded information. For now just ignoring.
+            #if strand not in self.targets.keys():
+            #    self.targets[strand]=dict()
+            if ctg not in self.targets.keys():
+                self.targets[ctg]=dict()
+            if left_coord not in self.targets[ctg].keys():
+                self.targets[ctg][left_coord]=dict()
+                self.targets[ctg][left_coord]["cov"]=0
+                self.targets[ctg][left_coord]["size"]=target_length
+            self.targets[ctg][left_coord]["cov"]+=length
+            return True
+
+
+    def print_targets(self):
+        for ctg in self.targets:
+            #print (ctg, self.cov_target)
+            for target in self.targets[ctg]:
+                localdepth = self.targets[ctg][target]['cov']/self.targets[ctg][target]['size']
+                #print (target,self.targets[ctg][target]['cov'],self.targets[ctg][target]['size'],localdepth)
+                if localdepth >= self.cov_target:
+                    #print (self.conditions)
+                    #print (target,ctg)
+                    if ctg not in self.targets_to_skip.keys():
+                        self.targets_to_skip[ctg]=set()
+                    self.targets_to_skip[ctg].add(target)
+                    print ("Try removing {}".format((self.targets[ctg][target]['cov'],self.targets[ctg][target]['cov']+self.targets[ctg][target]['size'])))
+        print (self.targets_to_skip)
+
+        target_list = list()
+        for condition in self.conditions:
+            for strand in condition.coords:
+                for chr in condition.coords[strand]:
+                    for coord in condition.coords[strand][chr]:
+                        #print("{},{},{},{}".format(chr, coord[0], coord[1], strand))
+                        if chr not in self.targets_to_skip.keys():
+                            target_list.append("{},{},{},{}".format(chr, coord[0], coord[1], strand))
+                        elif coord[0] not in self.targets_to_skip[chr]:
+                            target_list.append("{},{},{},{}".format(chr, coord[0], coord[1], strand))
+
+        self.write_new_toml(target_list, self.tomlfile)
 
     def refresh_index(self, reference):
         self.mappingobjects[reference]["last_used"] = time.time()

@@ -177,7 +177,7 @@ class FastqHandler(FileSystemEventHandler):
 
 class FastQMonitor(FastqHandler):
     def __init__(
-        self, args, rpc_connection, centrifuge=False, mapper=False, rununtil=False
+        self, args, rpc_connection, centrifuge=False, mapper=False, rununtil=False, target_track=False,
     ):
         if centrifuge:
             self.centrifuge = CentrifugeServer(
@@ -199,8 +199,16 @@ class FastQMonitor(FastqHandler):
         if mapper:
             self.mapper = Map()
             self.mapper.set_cov_target(args.depth)
+            if target_track:
+                #pass the toml file to the mapper so that it knows what is happening
+                self.mapper.parse_targets(args.tomlfile)
+                #not yet implemented
+                self.target_track=True
+            else:
+                self.target_track=False
         else:
             self.mapper = None
+            self.target_track=False
         self.rununtil = rununtil
         super().__init__(args=args, rpc_connection=rpc_connection)
 
@@ -236,7 +244,7 @@ class FastQMonitor(FastqHandler):
                     self.centrifuge,
                 )
                 # This prints those targets with a coverage greater than the threshold set in the arguments
-                if self.mapper:
+                if self.mapper and not self.target_track:
                     targets = self.mapper.target_coverage().keys()
                     print(self.mapper.report_coverage())
                     if len(targets) > len(self.targets):
@@ -276,6 +284,8 @@ class FastQMonitor(FastqHandler):
                                     ),
                                     Severity.WARN,
                                 )
+                    if self.target_track:
+                        self.mapper.print_targets()
 
             if currenttime + 5 > time.time():
                 time.sleep(5)
@@ -293,6 +303,9 @@ def parse_fastq_file(fastqfilelist, reference_loc, mapper, centrifuge):
                 logger.info("Mapping with {}.".format(reference_loc))
                 mapper.add_reference("test", reference_loc)
                 for file in fastqfilelist:
+                    print (file)
                     for desc, name, seq, qual in fastq_results(file):
-                        sequence_list = {"sequence": seq, "read_id": name}
+                        sequence_list = {"sequence": seq, "read_id": name, "desc":desc}
                         mapper.map_sequence("test", sequence_list)
+                    if mapper.check_tracking():
+                        mapper.print_targets()

@@ -34,7 +34,7 @@ class DefaultDAQValues:
 
 
 class GuppyCaller(PyGuppyClient):
-    def __init__(self, **kwargs):
+    def __init__(self, priority=PyGuppyClient.high_priority, **kwargs):
         super().__init__(**kwargs)
         self.connect()
 
