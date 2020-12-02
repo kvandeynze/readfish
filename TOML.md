@@ -11,7 +11,7 @@ Table of Contents
 ===
  - [TOML files](#toml-files)
  - [Config sections](#config-sections)
-   - [Guppy connection](#guppy-connection)
+   - [Base caller connection](#base-caller-connection)
    - [Conditions](#conditions)
  - [Validating a TOML](#validating-a-toml)
  
@@ -26,15 +26,20 @@ heading. See more in the [TOML specification](https://github.com/toml-lang/toml)
 Config sections
 ===
 
-Guppy connection
+Base caller connection
 ---
-The `caller_settings` table specifies the basecalling parameters used by guppy.  
+The `caller_settings` table specifies both the caller (CPU or GPU) and the base 
+calling parameters to be used.  
+
+### Guppy
+
+For Guppy the fields `config_name`, `host`, and `port` must be supplied.
 
 The `config_name` parameter must a valid guppy configuration excluding the file 
 extension; these can be found in the `data` folder of the your guppy installation 
 directory (`/opt/ont/guppy/data/*.cfg`).  
 
-### Remote basecalling
+#### Remote basecalling
 
 ```toml
 [caller_settings]
@@ -43,13 +48,34 @@ host = "REMOTE_SERVER_IP_ADDRESS"
 port = "REMOTE_GUPPY_SERVER_PORT"
 ``` 
 
-### Local basecalling
+#### Local basecalling
 
 ```toml
 [caller_settings]
 config_name = "dna_r9.4.1_450bps_fast"
 host = "127.0.0.1"
 port = 5555
+```
+
+### DeepNano-Blitz
+
+For CPU calling with DeepNano-Blitz the only required field is `network_type`.
+
+Valid parameters are:
+
+|          Key |       Type      | Values | Description |
+|-------------:|:---------------:|:------:|:------------|
+|network_type|string|[48, 56, 64, 80, 96, 256]|DeepNano-Blitz network to use|
+|threads|int|N/A|The number of threads to use for base calling, default is `2`|
+|beam_size|int|N/A| The beam size to use, default is `5`|
+|beam_cut_threshold|float|N/A|The beam cut threshold to use, default i s`0.01`|
+
+For example:
+
+```toml
+[caller_settings]
+network_type = "48"
+threads = 4
 ```
 
 Conditions
