@@ -346,8 +346,12 @@ def simple_analysis(
                     mode = "single_off"
 
             # This is where we make our decision:
-            # Get the associated action for this condition
-            decision_str = getattr(conditions[run_info[channel]], mode)
+            if seq_len < 1500 and mode in {"multi_on", "multi_off"}:
+                # If multi and under 1.5kb we will re-evaluate this read
+                decision_str = "proceed"
+            else:
+                # Get the associated action for this condition
+                decision_str = getattr(conditions[run_info[channel]], mode)
             # decision is an alias for the functions "unblock" or "stop_receiving"
             decision = decision_dict[decision_str]
 
