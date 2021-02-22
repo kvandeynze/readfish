@@ -56,6 +56,14 @@
                             "type": "string",
                             "minLength": 1
                         },
+                        "max_length": {
+                            "type": "number",
+                            "minimum": 1
+                        },
+                        "min_length": {
+                            "type": "number",
+                            "minimum": 0
+                        },
                         "max_chunks": {
                             "type": "number",
                             "minimum": 1
@@ -111,8 +119,8 @@
                     },
                     "required": [
                         "name",
-                        "max_chunks",
-                        "min_chunks",
+                        "max_length",
+                        "min_length",
                         "targets",
                         "single_on",
                         "single_off",

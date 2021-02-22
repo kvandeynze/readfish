@@ -289,18 +289,12 @@ def simple_analysis(
                 continue
 
             # This is an analysis channel
-            # Below minimum chunks
-            if (
-                tracker[channel][read_number]
-                <= conditions[run_info[channel]].min_chunks
-            ):
+            # Below minimum length
+            if seq_len <= conditions[run_info[channel]].min_length:
                 below_threshold = True
 
-            # Greater than or equal to maximum chunks
-            if (
-                tracker[channel][read_number]
-                >= conditions[run_info[channel]].max_chunks
-            ):
+            # Greater than or equal to maximum length
+            if seq_len >= conditions[run_info[channel]].max_length:
                 exceeded_threshold = True
 
             # No mappings
@@ -355,9 +349,9 @@ def simple_analysis(
             # decision is an alias for the functions "unblock" or "stop_receiving"
             decision = decision_dict[decision_str]
 
-            # If max_chunks has been exceeded AND we don't want to keep sequencing we unblock
+            # If max_length has been exceeded AND we don't want to keep sequencing we unblock
             if exceeded_threshold and decision_str != "stop_receiving":
-                mode = "exceeded_max_chunks_unblocked"
+                mode = "exceeded_max_length_unblocked"
                 decisiontracker.event_seen(mode)
                 unblock_batch_action_list.append((channel, read_number, read_id))
 
@@ -371,7 +365,7 @@ def simple_analysis(
                 "multi_on",
                 "multi_off",
             }:
-                mode = "below_min_chunks_unblocked"
+                mode = "below_min_length_unblocked"
                 unblock_batch_action_list.append((channel, read_number, read_id))
                 decisiontracker.event_seen(decision_str)
 
