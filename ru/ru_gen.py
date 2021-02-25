@@ -351,9 +351,13 @@ def simple_analysis(
 
             # If max_length has been exceeded AND we don't want to keep sequencing we unblock
             if exceeded_threshold and decision_str != "stop_receiving":
-                mode = "exceeded_max_length_unblocked"
+                if seq_len > 5000:
+                    mode = "exceeded_max_length_stop_receiving"
+                    stop_receiving_action_list.append((channel, read_number))
+                else:
+                    mode = "exceeded_max_length_unblocked"
+                    unblock_batch_action_list.append((channel, read_number, read_id))
                 decisiontracker.event_seen(mode)
-                unblock_batch_action_list.append((channel, read_number, read_id))
 
             # TODO: WHAT IS GOING ON?!
             #  I think that this needs to change between enrichment and depletion
