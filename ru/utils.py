@@ -440,8 +440,11 @@ def load_config_toml(filepath, validate=True):
     if not p.is_file():
         raise FileNotFoundError("TOML config file not found at '{}'".format(filepath))
 
-    # Load TOML to dict
-    toml_dict = toml.load(p)
+    toml_dict={}
+
+    while not toml_dict:
+        # Load TOML to dict
+        toml_dict = toml.load(p)
 
     # Check reference path
     reference_text = toml_dict.get("conditions", {}).get("reference", "")
