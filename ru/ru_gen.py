@@ -7,7 +7,7 @@ import functools
 import logging
 import sys
 import time
-from collections import defaultdict, deque, Counter
+from collections import defaultdict, deque, Counter, namedtuple
 from pathlib import Path
 from timeit import default_timer as timer
 
@@ -28,6 +28,7 @@ from ru.utils import (
 )
 from ru.utils import send_message, Severity, get_device, DecisionTracker
 
+ALIGNMENT = namedtuple("Alignment", "strand ctg r_st")
 
 _help = "Run targeted sequencing"
 _cli = BASE_ARGS + (
@@ -152,9 +153,11 @@ def simple_analysis(
         fh.write("# In the future this file may become a CSV file.\n")
         toml.dump(d, fh)
 
+    logger.info(caller_kwargs)
     caller = Caller(
         address="{}/{}".format(caller_kwargs["host"], caller_kwargs["port"]),
         config=caller_kwargs["config_name"],
+        align_ref=caller_kwargs["align_ref"],
     )
     # What if there is no reference or an empty MMI
 
@@ -173,6 +176,7 @@ def simple_analysis(
     # decided
     decided_reads = {}
     strand_converter = {1: "+", -1: "-"}
+    inv_strand_conv = {"+": 1, "-": -1}
 
     read_id = ""
 
@@ -203,6 +207,7 @@ def simple_analysis(
 
     l_string = "\t".join(("{}" for _ in CHUNK_LOG_FIELDS))
     loop_counter = 0
+    # logger.info(">>>>>>> ONLY BASECALLING")
     while client.is_running:
         if live_toml_path.is_file():
             # Reload the TOML config from the *_live file
@@ -235,23 +240,33 @@ def simple_analysis(
 
         # TODO: Fix the logging to just one of the two in use
 
-        if not mapper.initialised:
-            time.sleep(throttle)
-            continue
-
         loop_counter += 1
         t0 = timer()
         r = 0
         unblock_batch_action_list = []
         stop_receiving_action_list = []
 
-        for read_info, read_id, seq_len, results in mapper.map_reads_2(
-            caller.basecall_minknow(
-                reads=client.get_read_chunks(batch_size=batch_size, last=True),
-                signal_dtype=client.signal_dtype,
-                decided_reads=decided_reads,
-            )
+        for read_info, data in caller.get_all_data(
+            reads=client.get_read_chunks(batch_size=batch_size, last=True),
+            signal_dtype=client.signal_dtype,
+            decided_reads=decided_reads,
         ):
+            read_id = data["metadata"]["read_id"]
+            seq = data["datasets"]["sequence"]
+            seq_len = data["metadata"]["sequence_length"]
+            qual = data["datasets"]["qstring"]
+
+            if data["metadata"]["alignment_genome"] == "*":
+                results = []
+            else:
+                results = [
+                    ALIGNMENT(
+                        inv_strand_conv.get(data["metadata"]["alignment_direction"]),
+                        data["metadata"]["alignment_genome"],
+                        data["metadata"]["alignment_genome_start"],
+                    )
+                ]
+
             r += 1
             read_start_time = timer()
             channel, read_number = read_info
@@ -441,41 +456,23 @@ def run(parser, args):
     logger.info(" ".join(sys.argv))
     print_args(args, logger=logger)
 
-    # Parse configuration TOML
-    # TODO: num_channels is not configurable here, should be inferred from client
-    run_info, conditions, reference, caller_kwargs = get_run_info(
-        args.toml, num_channels=512
-    )
-    live_toml = Path("{}_live".format(args.toml))
-
-    # Load Minimap2 index
-    logger.info("Initialising minimap2 mapper")
-    mapper = CustomMapper(reference)
-    logger.info("Mapper initialised")
-
     position = get_device(args.device, host=args.host, port=args.port)
 
     read_until_client = RUClient(
         mk_host=position.host,
-        mk_port=position.description.rpc_ports.insecure,
+        mk_port=position.description.rpc_ports.secure,
         filter_strands=True,
         cache_type=AccumulatingCache,
     )
 
-    send_message(
-        read_until_client.connection,
-        "ReadFish is controlling sequencing on this device. You use it at your own risk.",
-        Severity.WARN,
+    # Parse configuration TOML
+    # TODO: num_channels is not configurable here, should be inferred from client
+    run_info, conditions, reference, caller_kwargs = get_run_info(
+        args.toml, num_channels=read_until_client.channel_count
     )
+    live_toml = Path("{}_live".format(args.toml))
 
-    for message, sev in describe_experiment(conditions, mapper):
-        logger.info(message)
-
-        send_message(
-            read_until_client.connection,
-            message,
-            sev,
-        )
+    mapper = CustomMapper(None)
 
     """
     This experiment has N regions on the flowcell.
@@ -500,6 +497,7 @@ def run(parser, args):
             unblock_duration=args.unblock_duration,
             throttle=args.throttle,
             batch_size=args.batch_size,
+            flowcell_size=read_until_client.channel_count,
             cl=chunk_logger,
             pf=paf_logger,
             live_toml_path=live_toml,

@@ -24,6 +24,9 @@
                 },
                 "barcode_kits": {
                     "type": "array"
+                },
+                "align_ref": {
+                    "type": "string"
                 }
             },
             "required": [
