@@ -60,7 +60,7 @@ import functools
 import logging
 import sys
 import time
-from collections import defaultdict, deque, Counter
+from collections import defaultdict, deque, Counter, namedtuple
 from pathlib import Path
 from timeit import default_timer as timer
 
@@ -82,6 +82,7 @@ from ru.utils import (
 from ru.utils import send_message, Severity, get_device, DecisionTracker
 
 
+ALIGNMENT = namedtuple("Alignment", "strand ctg r_st r_en")
 _help = "Run targeted sequencing"
 _cli = BASE_ARGS + (
     (
@@ -209,6 +210,7 @@ def simple_analysis(
         address="{}/{}".format(caller_kwargs["host"], caller_kwargs["port"]),
         config=caller_kwargs["config_name"],
         barcode_kits=caller_kwargs["barcode_kits"],
+        align_ref=caller_kwargs["align_ref"],
     )
     # What if there is no reference or an empty MMI
 
@@ -227,6 +229,7 @@ def simple_analysis(
     # decided
     decided_reads = {}
     strand_converter = {1: "+", -1: "-"}
+    inv_strand_conv = {"+": 1, "-": -1}
 
     read_id = ""
 
@@ -258,6 +261,9 @@ def simple_analysis(
     l_string = "\t".join(("{}" for _ in CHUNK_LOG_FIELDS))
     loop_counter = 0
     while client.is_running:
+        if not client.is_phase_sequencing:
+            time.sleep(5)
+            continue
         barcode_counter = Counter()
         if live_toml_path.is_file():
             # Reload the TOML config from the *_live file
@@ -292,9 +298,9 @@ def simple_analysis(
 
         # TODO: Fix the logging to just one of the two in use
 
-        if not mapper.initialised:
-            time.sleep(throttle)
-            continue
+        # if not mapper.initialised:
+        #     time.sleep(throttle)
+        #     continue
 
         loop_counter += 1
         t0 = timer()
@@ -312,10 +318,22 @@ def simple_analysis(
             read_id = metadata["read_id"]
             seq = data["datasets"]["sequence"]
             seq_len = metadata["sequence_length"]
-            results = list(mapper.map_read(seq))
+            genome = data["metadata"].get("alignment_genome", "*")
+            if genome == "*":
+                results = []
+            else:
+                results = [
+                    ALIGNMENT(
+                        inv_strand_conv.get(data["metadata"]["alignment_direction"]),
+                        data["metadata"]["alignment_genome"],
+                        data["metadata"]["alignment_genome_start"],
+                        data["metadata"]["alignment_genome_end"]
+                    )
+                ] 
 
             # Get barcode results
             barcode = metadata.get("barcode_arrangement", None)
+            # logger.info(f"{read_id} >> {barcode}")
 
             if barcode is not None:
                 # use barcode result here
@@ -519,14 +537,14 @@ def run(parser, args):
 
     # Load Minimap2 index
     logger.info("Initialising minimap2 mapper")
-    mapper = CustomMapper(reference)
+    mapper = CustomMapper(None)
     logger.info("Mapper initialised")
 
     position = get_device(args.device, host=args.host)
 
     read_until_client = RUClient(
         mk_host=position.host,
-        mk_port=position.description.rpc_ports.insecure,
+        mk_port=position.description.rpc_ports.secure,
         filter_strands=True,
         cache_type=AccumulatingCache,
     )

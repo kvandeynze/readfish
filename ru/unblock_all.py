@@ -55,6 +55,9 @@ def simple_analysis(
         Severity.WARN,
     )
     while client.is_running and time.time() < run_duration:
+        if not client.is_phase_sequencing:
+            time.sleep(5)
+            continue
 
         r = 0
         t0 = timer()
@@ -128,7 +131,7 @@ def run(parser, args):
 
     read_until_client = RUClient(
         mk_host=position.host,
-        mk_port=position.description.rpc_ports.insecure,
+        mk_port=position.description.rpc_ports.secure,
         filter_strands=True,
         cache_type=AccumulatingCache,
     )

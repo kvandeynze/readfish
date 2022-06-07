@@ -15,7 +15,7 @@ way most fit for purpose, and a return call can be made to the server to unblock
 the read in progress and so direct sequencing capacity towards reads of interest.
 
 
-**This implementation of ReadFish requires Guppy version >= 4.0.11 and MinKNOW version core >= 4.0.4 . It will not work on earlier versions.** 
+**This implementation of ReadFish requires Guppy version >= 6.0.0 and MinKNOW core version >= 5.0.0 . It will not work on earlier versions.** 
 
 
 **Currently we only recommend LINUX for running ReadFish. We have not had 
@@ -24,6 +24,7 @@ effective performance on other platforms to date.**
 The code here has been tested with Guppy in GPU mode using GridION Mk1 and 
 NVIDIA RTX2080 on live sequencing runs and an NIVIDA GTX1080 using playback 
 on a simulated run (see below for how to test this).  
+On PromethION using MinKNOW 5.1.0 and Guppy 6.0.6.
 This code is run at your own risk as it DOES affect sequencing output. You 
 are **strongly** advised to test your setup prior to running (see below for 
 example tests).
@@ -49,7 +50,7 @@ pip install --upgrade pip
 
 # Install our ReadFish Software
 pip install git+https://github.com/nanoporetech/read_until_api@v3.0.0
-pip install git+https://github.com/LooseLab/readfish@guppy_6
+pip install git+https://github.com/LooseLab/readfish@guppy_6_minknow_5
 
 # Install ont_pyguppy_client_lib that matches your guppy server version. E.G.
 pip install ont_pyguppy_client_lib==4.0.11

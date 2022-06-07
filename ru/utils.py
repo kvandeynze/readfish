@@ -915,7 +915,7 @@ def setup_logger(
 
 def get_device(device, host="127.0.0.1", port=None, use_tls=False):
     """Get an RPC connection from a device"""
-    manager = Manager(host=host, port=port, use_tls=use_tls)
+    manager = Manager(host=host, port=port)
     for position in manager.flow_cell_positions():
         if position.name == device:
             return position
