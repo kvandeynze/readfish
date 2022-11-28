@@ -74,8 +74,8 @@ CHUNK_LOG_FIELDS = (
     "timestamp",
 )
 
-
-def simple_analysis(
+# TODO : Figure out where targets are introduced and if we can separate decisions from main function 
+def simple_analysis( #this is called decision_boss_runs in ru_gen_boss_runs, it is the main decision code in both scripts
     client,
     batch_size=512,
     throttle=0.1,
@@ -116,7 +116,7 @@ def simple_analysis(
     run_info : dict
         Dictionary of {channel: index} where index corresponds to an index in `conditions`
     conditions : list
-        Experimental conditions as List of namedtuples.
+        Experimental conditions as List of namedtuples. IS THIS READ FROM TOML
     mapper : mappy.Aligner
     caller_kwargs : dict
 
@@ -203,6 +203,7 @@ def simple_analysis(
 
     l_string = "\t".join(("{}" for _ in CHUNK_LOG_FIELDS))
     loop_counter = 0
+    #where mask is in bossruns version
     while client.is_running:
         if live_toml_path.is_file():
             # Reload the TOML config from the *_live file
@@ -242,10 +243,10 @@ def simple_analysis(
         loop_counter += 1
         t0 = timer()
         r = 0
-        unblock_batch_action_list = []
+        unblock_batch_action_list = [] #what was the point of appending the tuples above if this is just redefined here?
         stop_receiving_action_list = []
 
-        for read_info, read_id, seq_len, results in mapper.map_reads_2(
+        for read_info, read_id, seq_len, results in mapper.map_reads_2( #this is taking read info from the basecaller and mappy
             caller.basecall_minknow(
                 reads=client.get_read_chunks(batch_size=batch_size, last=True),
                 signal_dtype=client.signal_dtype,
@@ -261,7 +262,7 @@ def simple_analysis(
             mode = ""
             exceeded_threshold = False
             below_threshold = False
-            log_decision = lambda: cl.debug(
+            log_decision = lambda: cl.debug( #cl is a logger object from input
                 l_string.format(
                     loop_counter,
                     r,
@@ -310,7 +311,7 @@ def simple_analysis(
             hits = set()
             for result in results:
                 pf.debug("{}\t{}\t{}".format(read_id, seq_len, result))
-                hits.add(result.ctg)
+                hits.add(result.ctg) #adds name in reference sequence hit mapped to according to mappy
 
             if hits & conditions[run_info[channel]].targets:
                 # Mappings and targets overlap
@@ -443,7 +444,7 @@ def run(parser, args):
 
     # Parse configuration TOML
     # TODO: num_channels is not configurable here, should be inferred from client
-    run_info, conditions, reference, caller_kwargs = get_run_info(
+    run_info, conditions, reference, caller_kwargs = get_run_info( #this is where conditions are separated from the rest of the toml
         args.toml, num_channels=512
     )
     live_toml = Path("{}_live".format(args.toml))
@@ -489,7 +490,7 @@ def run(parser, args):
     # FIXME: currently flowcell size is not included, this should be pulled from
     #  the read_until_client
 
-    read_until_client.run(
+    read_until_client.run( #telling readuntil client to run if it can
         first_channel=args.channels[0],
         last_channel=args.channels[-1],
     )

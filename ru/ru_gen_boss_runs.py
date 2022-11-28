@@ -67,7 +67,7 @@ CHUNK_LOG_FIELDS = (
 )
 
 
-def write_out_channels_toml(conditions, run_info, client):
+def write_out_channels_toml(conditions, run_info, client):#this doesnt exist in original code since it is the function to write out new targets as this runs
     """
     Write out the channels toml file
 
@@ -87,7 +87,7 @@ def write_out_channels_toml(conditions, run_info, client):
     """
     d = {
         "conditions": {
-            str(v): {"channels": [], "name": conditions[v].name}
+            str(v): {"channels": [], "name": conditions[v].name} #is this adding new targets to the toml?
             for k, v in run_info.items()
         }
     }
@@ -101,10 +101,10 @@ def write_out_channels_toml(conditions, run_info, client):
         )
         fh.write("# It may be changed or overwritten if you restart ReadFish.\n")
         fh.write("# In the future this file may become a CSV file.\n")
-        toml.dump(d, fh)
+        toml.dump(d, fh) #writing out the reformatted conditions and run_info
 
 
-def decision_boss_runs(
+def decision_boss_runs( #this says there is no explicit mask given but it describes mask_path as the path to boss_runs mask... is it given or written out?
     client,
     batch_size=512,
     throttle=0.1,
@@ -163,7 +163,7 @@ def decision_boss_runs(
         live_toml_path = Path(live_toml_path)
         if live_toml_path.is_file():
             live_toml_path.unlink()
-    write_out_channels_toml(conditions, run_info, client)
+    write_out_channels_toml(conditions, run_info, client) #this is NOT in original
 
     caller = Caller(
         address="{}/{}".format(caller_kwargs["host"], caller_kwargs["port"]),
@@ -185,7 +185,7 @@ def decision_boss_runs(
     # decided
     decided_reads = {}
     strand_converter = {1: "+", -1: "-"}
-    strand_converter_br = {1: False, -1: True}
+    strand_converter_br = {1: False, -1: True} #only in BossRuns, this may be important for the query_array function
 
     read_id = ""
 
@@ -217,12 +217,12 @@ def decision_boss_runs(
     l_string = "\t".join(("{}" for _ in CHUNK_LOG_FIELDS))
     loop_counter = 0
     # TODO this only works for 1 boss runs condition, and if there is one Boss runs conditions
-    mask_path = Path([getattr(cond, "mask", False)for cond in conditions if getattr(cond, "mask", False)][0])
-    masks = {}
+    mask_path = Path([getattr(cond, "mask", False)for cond in conditions if getattr(cond, "mask", False)][0]) #each condition for original readfish includes targets
+    masks = {} #masks is dynamic, they updated this to be initialized here because before they were overriding it, looks like below they output an updated mask file
     while client.is_running:
-        # todo reverse engineer from channels.toml
+        # todo reverse engineer from channels.toml (wha)
         if live_toml_path.is_file():
-            # Reload the TOML config from the *_live file
+            # Reload the TOML config from the *_live file (is live toml updated via bossruns output? if so where are these calculations?)
             run_info, conditions, new_reference, _ = get_run_info(
                 live_toml_path, flowcell_size, validate=False
             )
@@ -262,11 +262,11 @@ def decision_boss_runs(
         unblock_batch_action_list = []
         stop_receiving_action_list = []
 
-        if (mask_path / "masks.updated").exists():
+        if (mask_path / "masks.updated").exists():#when are masks updated? no other file contains masks.updated, should be a .npy file
             try:
                 # TODO this only works for 1 boss runs condition
                 masks = {path.stem: np.load(path) for path in
-                         mask_path.glob("*.npy")}
+                         mask_path.glob("*.npy")} #I also looked for anywhere where .npy files are created and nothing but these lines came up, masks is populated by numpy arrays that are produced somewhere else
                 logger.info(f"Reloaded mask dict for {masks.keys()}")
             except Exception as e:
                 logger.error(f"Error reading mask array ->>> {repr(e)}")
@@ -338,7 +338,7 @@ def decision_boss_runs(
                 pf.debug("{}\t{}\t{}".format(read_id, seq_len, result))
                 hits.add(result.ctg)
 
-            if hits & conditions[run_info[channel]].targets:
+            if hits & conditions[run_info[channel]].targets: #mode is determined by targets (from conditions in live toml, not sure where that is updated either)
                 # Mappings and targets overlap
                 coord_match = any(
                     between(r.r_st, c)
@@ -362,7 +362,7 @@ def decision_boss_runs(
                         # Multiple matches to targets outside the coordinate range
                         mode = "multi_off"  ##
 
-            elif hits and conditions[run_info[channel]].mask:
+            elif hits and conditions[run_info[channel]].mask: #checking if current hit is in the mask_dict, query_array is a function in utils. mask appears to be a separate field in live toml but also masks dictionary was populated by saved numpy arrays, are these different?? how do both of these differ from targets and why are there both?
                 coord_match = any(
                     [
                         query_array(
@@ -375,7 +375,7 @@ def decision_boss_runs(
                         for mapping in mappings
                     ]
                 )
-                if len(hits) == 1:
+                if len(hits) == 1: #this block is the same as decisions based on targets input
                     if coord_match:
                         # Single match that is within coordinate range
                         mode = "single_on"
@@ -401,7 +401,7 @@ def decision_boss_runs(
 
             # This is where we make our decision:
             # Get the associated action for this condition
-            decision_str = getattr(conditions[run_info[channel]], mode)
+            decision_str = getattr(conditions[run_info[channel]], mode) #decision making is the same whether it comes from mask or targets
             # decision is an alias for the functions "unblock" or "stop_receiving"
             decision = decision_dict[decision_str]
 
@@ -546,7 +546,7 @@ def run(parser, args):
     )
 
     try:
-        decision_boss_runs(
+        decision_boss_runs( #this doesn't include mask_path args, will this code even run or have they just not updated the code to include bossruns since it hasn't been publishes yet?
             read_until_client,
             unblock_duration=args.unblock_duration,
             throttle=args.throttle,

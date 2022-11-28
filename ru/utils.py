@@ -456,7 +456,7 @@ def get_targets(targets):
     return t
 
 
-def load_config_toml(filepath, validate=True):
+def load_config_toml(filepath, validate=True): #I need to figure out where the toml class is so I can add methods for different inputs
     """Load a TOML file and check file paths
 
     Parameters
@@ -570,7 +570,7 @@ def describe_experiment(conditions, mapper):
         # Convert to double stranded
         ref_len = 2 * ref_len
 
-        for region in conditions:
+        for region in conditions: #conditions is per region(?), is it per region sequenced or per region in targets?
             conds = {
                 "unblock": [],
                 "stop_receiving": [],
@@ -731,7 +731,7 @@ def get_run_info(toml_filepath, num_channels=512, validate=True):
     return run_info, split_conditions, reference, caller_settings
 
 
-def query_array(start_pos, mask_dict, reverse, contig, logger):
+def query_array(start_pos, mask_dict, reverse, contig, logger): #this makes a decision based on the mask_dict, but where does it come from?
     """
     Query numpy mask array and return decision to keep sequencing
     Parameters
@@ -757,11 +757,11 @@ def query_array(start_pos, mask_dict, reverse, contig, logger):
     # if logger is not None:
     #     logger.warning(f"Mask file does not exist at {str(mask_file)}")
     if contig not in mask_dict:
-        logger.warning(f"{contig} is not in mask dict")
+        logger.warning(f"{contig} is not in mask dict") #regions are in mask, not sure when contructed or added
         return 1
     arr = mask_dict.get(contig)
     try:
-        return arr[:, int(reverse)][start_pos // 100]
+        return arr[:, int(reverse)][start_pos // 100] #I don't know what this is doing, should be returning either 0 or 1 (true or false)
     except Exception as e:
         return 1
         
